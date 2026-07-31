@@ -1,0 +1,20 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+
+# Secrets and local configuration
+.env
+
+# Aider session history
+.aider.chat.history.md
+.aider.input.history
+
+# Runtime state and generated output
+state.json
+map.json
+world_state.json
+local_packets.log
+
+# Temporary/manual backups
+*.partial-backup

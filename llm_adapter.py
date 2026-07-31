@@ -1,0 +1,565 @@
+from openai import OpenAI
+from dotenv import load_dotenv
+from packet_interpreter import recover_embedded_packet
+import os
+import requests
+import json
+import rules
+
+load_dotenv()
+
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+
+MODEL = "gpt-5"
+
+EXTRACT_CANON = True
+EXTRACTION_MODE = "local"  # "cloud" or "local"
+
+LOCAL_CONDITIONING_ENABLED = True
+LOCAL_MODEL = "mistral:latest"
+LOCAL_URL = "http://192.168.0.18:11434/api/generate"
+
+DEBUG_LOCAL_PACKETS = True
+LOCAL_PACKET_LOG = "local_packets.log"
+
+LAST_PACKET = None
+
+def format_conditioning_packet(packet):
+
+    if not packet:
+        return ""
+
+    if isinstance(packet, str):
+        return packet
+
+    if not isinstance(packet, dict):
+        return str(packet)
+
+    return (
+        f'ACTION: {packet.get("action", "unknown")}\n'
+        f'TARGET: {packet.get("target", "none")}\n'
+        f'CONFIDENCE: {packet.get("confidence", "medium")}\n'
+        f'INTENT: {packet.get("intent", "")}'
+    )
+
+def log_local_packet(user_input, packet):
+
+    if not DEBUG_LOCAL_PACKETS:
+        return
+
+    with open(LOCAL_PACKET_LOG, "a") as f:
+
+        f.write("\n")
+        f.write("=" * 60 + "\n")
+        f.write(f"INPUT: {user_input}\n")
+        f.write(f"PACKET: {packet}\n")
+
+def log_extraction_result(user_input, candidates):
+
+    if not DEBUG_LOCAL_PACKETS:
+        return
+
+    with open(LOCAL_PACKET_LOG, "a") as f:
+
+        f.write(f"CANDIDATES: {candidates}\n")
+
+def log_final_state(facts):
+
+    if not DEBUG_LOCAL_PACKETS:
+        return
+
+    from canon import fact_slot
+
+    with open(LOCAL_PACKET_LOG, "a") as f:
+
+        active_facts = [
+            fact["text"]
+            for fact in facts
+            if fact.get("status", "active") == "active"
+        ]
+
+        active_slots = []
+
+        for fact in facts:
+
+            if fact.get("status", "active") != "active":
+                continue
+
+            if fact.get("type", "state") != "state":
+                continue
+
+            slot = fact_slot(
+                fact["text"],
+                fact.get("type", "state")
+            )
+
+            active_slots.append(slot)
+
+        f.write(f"RULE: {rules.LAST_RULE}\n")
+        f.write(f"FINAL STATE: {active_facts}\n")
+        f.write(f"SLOTS: {active_slots}\n")
+
+def normalize_conditioning_packet(packet):
+
+    if not isinstance(packet, dict):
+        return packet
+
+    return {
+        "action": str(packet.get("action", "unknown")).strip().lower(),
+        "target": str(packet.get("target", "none")).strip().lower(),
+        "intent": str(packet.get("intent", "")).strip(),
+        "confidence": str(packet.get("confidence", "medium")).strip().lower()
+    }
+
+def get_local_conditioning(user_input, facts):
+    """
+    Optional local LLM interpretation layer.
+
+    It never writes canon directly.
+    It only provides a small hint to the extraction prompt.
+    """
+    if not LOCAL_CONDITIONING_ENABLED:
+        packet = normalize_conditioning_packet({
+            "action": parsed.get("action", "unknown"),
+            "target": parsed.get("target", "none"),
+            "intent": parsed.get("intent", ""),
+            "confidence": parsed.get("confidence", "medium")
+        })
+
+        return packet
+    canon_block = "\n".join(
+        f'- {fact["text"]}'
+        for fact in facts
+        if fact.get("status", "active") == "active"
+    )
+
+    prompt = f"""
+You are a tiny command interpreter for Mushin Lite.
+
+Return ONLY a compact interpretation of the user command.
+
+Do not write prose.
+Do not invent story.
+Do not create canon.
+Do not explain.
+
+ACTIVE CANON:
+{canon_block}
+
+USER COMMAND:
+{user_input}
+
+Return ONLY valid JSON.
+
+Schema:
+{{
+  "action": "short verb",
+  "target": "main object or none",
+  "intent": "one short phrase"
+}}
+"""
+
+    try:
+        response = requests.post(
+            LOCAL_URL,
+            json={
+                "model": LOCAL_MODEL,
+                "prompt": prompt,
+                "stream": False,
+            },
+            timeout=90,
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        raw_text = data.get("response", "").strip()
+
+        #print(f"[raw local response: {raw_text}]")
+
+        try:
+            parsed = json.loads(raw_text)
+
+            return normalize_conditioning_packet({
+                "action": parsed.get("action", "unknown"),
+                "target": parsed.get("target", "none"),
+                "intent": parsed.get("intent", ""),
+                "confidence": parsed.get("confidence", "medium")
+            })
+
+        except json.JSONDecodeError:
+            packet = {
+                "action": "unknown",
+                "target": "none",
+                "intent": raw_text,
+                "confidence": "low"
+            }
+
+            return normalize_conditioning_packet(
+                recover_embedded_packet(packet)
+            )
+            
+    except Exception as e:
+        return normalize_conditioning_packet({
+            "action": "unknown",
+            "target": "none",
+            "intent": "local conditioning unavailable",
+            "confidence": "low"
+        })
+
+def extract_with_cloud(extraction_prompt, user_input, assistant_text):
+
+    extraction = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": extraction_prompt
+            },
+            {
+                "role": "user",
+                "content": f"""
+USER:
+{user_input}
+
+ASSISTANT:
+{assistant_text}
+"""
+            }
+        ]
+    )
+
+    return extraction.choices[0].message.content
+
+# TODO:
+# move extraction rules from prompt hacks
+# to packet-driven extraction
+
+def extract_with_local(extraction_prompt, user_input, assistant_text):
+
+    prompt = f"""
+Extract canon facts from this command.
+
+Return ONLY lines in this format:
+type | fact
+
+Allowed types:
+state
+event
+trait
+
+Rules:
+- Use event for actions that happened.
+- Use state for current object state.
+- If nothing important changed, return NONE.
+- Do not explain.
+- Do not copy "The action occurred..." as a fact.
+- Interpret the USER command directly.
+- For "close <object>", return:
+  event | The player closed the <object>.
+  state | The <object> is closed.
+- For "open <object>", return:
+  event | The player opened the <object>.
+  state | The <object> is open.
+- For "take <object>", "pick up <object>", or "grab <object>", return:
+  event | The player picked up the <object>.
+  state | The player is holding the <object>.
+- For "drop <object>", return:
+  event | The player dropped the <object>.
+  state | The <object> is on the ground.
+- For "break <object>", return:
+  event | The player broke the <object>.
+  state | The <object> is broken.
+- For "turn <object> inside out", return:
+  event | The player turned the <object> inside out.
+  state | The <object> is inside out.
+
+
+USER:
+{user_input}
+
+ASSISTANT:
+{assistant_text}
+"""
+
+    try:
+        response = requests.post(
+            LOCAL_URL,
+            json={
+                "model": LOCAL_MODEL,
+                "prompt": prompt,
+                "stream": False,
+            },
+            timeout=90,
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        return data.get("response", "").strip()
+
+    except Exception as e:
+        print(f"[local extraction failed: {e}]")
+        return "NONE"
+
+def narrate_scene(scene):
+    import json
+
+    if isinstance(scene, dict):
+        rendered_text = scene.get("rendered_text", "")
+        ctx = scene.get("presentation_context", {})
+        scene_for_prompt = json.dumps(scene, indent=2)
+    else:
+        rendered_text = scene
+        ctx = {}
+        scene_for_prompt = scene
+
+    prompt = f"""
+You are a deterministic text renderer, not a storyteller.
+
+Your job is to rewrite RENDERED_TEXT into one short second-person paragraph.
+
+Hard rules:
+- Do not add any fact that is not explicitly present.
+- Do not infer possession.
+- If an object is listed under objects, say it is present or visible, not carried.
+- Do not add scenery.
+- Do not add furniture.
+- Do not add atmosphere.
+- Do not add characters.
+- Do not add choices.
+- Do not add exits beyond the listed exits.
+- Do not rename rooms unless a room_name is provided.
+- Preserve direction and destination accurately.
+
+Allowed facts are only these:
+{scene_for_prompt}
+
+RENDERED_TEXT:
+{rendered_text}
+
+Return only the rewritten paragraph.
+"""
+
+    try:
+        import requests
+
+        response = requests.post(
+            "http://192.168.0.18:11434/api/generate",
+            json={
+                "model": "mistral:latest",
+                "prompt": prompt,
+                "stream": False,
+            },
+            timeout=120,
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+        return data.get("response", rendered_text).strip() or rendered_text
+
+    except Exception as e:
+        return f"[narration failed: {e}]\n\n{rendered_text}"
+
+def chat(user_input, facts):
+
+    canon_block = "\n".join(
+        f'- {fact["text"]}'
+        for fact in facts
+        if fact.get("status", "active") == "active"
+    )
+
+    conditioning_packet = get_local_conditioning(user_input, facts)
+
+    global LAST_PACKET
+    LAST_PACKET = conditioning_packet
+    
+    log_local_packet(user_input, conditioning_packet)
+
+    conditioning_text = format_conditioning_packet(
+        conditioning_packet
+    )
+
+    if LOCAL_CONDITIONING_ENABLED:
+        print(f"[raw local packet: {conditioning_packet}]")
+        print(f"[raw local conditioning:\n{conditioning_text}]")
+    else:
+        print("[local conditioning: bypassed]")
+
+    system_prompt = f"""
+    You are a natural interactive storyteller and assistant.
+
+    The following facts are CANON.
+    They are external truth maintained by Mushin Lite.
+    Do not contradict them.
+
+    CANON:
+    {canon_block}
+
+    STYLE RULES:
+    - Continue the scene directly.
+    - Do not confirm canon.
+    - Do not say "confirmed."
+    - Do not offer help.
+    - Do not ask what the user wants next.
+    - Do not make bullet lists.
+    - Do not explain options.
+    - If the user writes a character action or line, respond with the next beat of the scene.
+    - Keep responses short: 1 to 4 paragraphs.
+    """
+
+#    response = client.chat.completions.create(
+#        model=MODEL,
+#        messages=[
+#            {
+#                "role": "system",
+#                "content": system_prompt
+#            },
+#            {
+#                "role": "user",
+#                "content": user_input
+#            }
+#        ]
+#    )
+#
+#    assistant_text = response.choices[0].message.content
+
+    assistant_text = f"The action occurred: {user_input}"
+
+    candidates = []
+
+    if EXTRACT_CANON:
+        
+        extraction_prompt = f"""
+LOCAL CONDITIONING:
+{conditioning_text}
+
+Use LOCAL CONDITIONING as a hint when interpreting the user command.
+It is not canon.
+If LOCAL CONDITIONING identifies an action and target, use that to help extract state/event facts.
+
+Extract ONLY facts that should affect the next several turns.
+
+ACTIVE CANON FACTS:
+{canon_block}
+
+Before extracting a new fact, compare it against ACTIVE CANON FACTS.
+
+CANON AWARENESS RULES:
+- If the fact is already covered by canon, return NONE.
+- If the new fact contradicts an active canon fact, return only the new current fact.
+- Prefer the latest current state from USER + ASSISTANT.
+- Do not duplicate existing state facts.
+
+Prefer CURRENT STATE over history.
+
+AUTO-STORE ONLY:
+- persistent character traits stated clearly
+- fears or strong preferences stated clearly
+- relationship changes stated clearly
+- current possession state
+- important object location changes
+- objects picked up, put down, handed over, opened, closed, broken, hidden, or moved
+- major events that would affect continuity
+- current scene state that would be wrong if forgotten next turn
+- object pickup/drop/put-down actions as EVENT facts
+
+STATE RULES:
+- If an object changes hands, store only the final current state.
+- Do NOT infer ownership from possession.
+- Do NOT infer habits from one line of dialogue.
+- Do NOT extract timing/countdown details unless explicitly important.
+- If multiple facts say nearly the same thing, return only the most current/specific one.
+- If the USER gives an action in first person or imperative form, "I", "me", "my", or implied command actions refer to the player, not another character.
+- For commands like "pick up umbrella", "take umbrella", "grab umbrella", or "put umbrella on bench", the actor is the player.
+- Do not assign the user's action to another character unless the user explicitly names that character as the actor.
+- STATE facts describe current reality.
+- EVENT facts describe something that happened and remain historically true.
+- Do not convert events into permanent current state unless the current state still applies.
+- For "put down <object>", extract the object's new location if known.
+- If the user does not specify where an object is put down, assume it is put down in the current scene/location.
+- Prefer positive current state over negative state.
+- Prefer "The umbrella is on the bench" over "The player is not holding the umbrella" when a destination surface is known.
+- If the setup says an object started on a surface, and the user later says "put down <object>" without a destination, prefer returning it to that known surface.
+
+GOOD:
+trait | Nina hates thunderstorms.
+state | Nina is holding the umbrella.
+state | The umbrella is on the bench.
+event | The player picked up the umbrella.
+event | The player introduced himself to Nina.
+event | The player dropped the umbrella.
+event | The player picked up the book.
+state | The umbrella is on the ground.
+
+BAD:
+event | Matt glanced at the umbrella.
+event | Nina smiled.
+event | Rain tapped on the shelter.
+trait | Nina owns the umbrella.
+trait | She habitually carries an umbrella.
+event | The bus is two stops away.
+
+Return facts in this exact format:
+type | fact
+
+Allowed types:
+trait
+state
+event
+
+If unsure, return NONE.
+
+Return one fact per line.
+"""
+
+        if EXTRACTION_MODE == "local":
+            extracted_text = extract_with_local(
+                extraction_prompt,
+                user_input,
+                assistant_text
+            )
+        else:
+            extracted_text = extract_with_cloud(
+                extraction_prompt,
+                user_input,
+                assistant_text
+            )
+
+        for line in extracted_text.splitlines():
+
+            line = line.strip()
+
+            if not line:
+                continue
+
+            if line.upper() == "NONE":
+                continue
+
+            if "|" not in line:
+                continue
+
+            fact_type, fact_text = line.split("|", 1)
+
+            fact_type = fact_type.strip().lower()
+            fact_text = fact_text.strip()
+
+            if fact_text.upper().startswith("NONE"):
+                continue
+
+            if fact_type not in ["trait", "state", "event"]:
+                continue
+
+            candidates.append({
+                "type": fact_type,
+                "text": fact_text
+            })
+
+    log_extraction_result(user_input, candidates)
+
+    return assistant_text, candidates
