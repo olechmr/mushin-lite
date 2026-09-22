@@ -18,3 +18,4 @@ local_packets.log
 
 # Temporary/manual backups
 *.partial-backup
+.aider*
