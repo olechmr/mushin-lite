@@ -306,20 +306,25 @@ def collapse_observation(
         if not already_present:
             available_candidates.append(candidate)
 
-    results = []
+    if not available_candidates:
+        return []
 
-    if available_candidates:
-        selected = select_candidate(
-            available_candidates,
-            room_id,
-            observation_space,
-            verb,
-        )
+    selected = select_candidate(
+        available_candidates,
+        room_id,
+        observation_space,
+        verb,
+    )
 
-        reveal = build_discovery_packet(selected, room_id)
+    if selected is None:
+        return []
 
-        if reveal:
-            results.append(reveal)
+    reveal = build_discovery_packet(selected, room_id)
+
+    if not reveal:
+        return []
+
+    results = [reveal]
 
     if marker:
         results.append(
