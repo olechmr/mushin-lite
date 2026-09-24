@@ -345,11 +345,18 @@ def apply_rules(packet, candidates, world, world_state):
         destination = map_data.EXITS.get(room, {}).get(target)
 
         if not destination:
-            destination = generate_room_name(room, target)
-            add_exit(room, target, destination)
+            LAST_RULE = "no established exit"
+            LAST_RULE_TYPE = "block"
 
-            LAST_RULE = "lazy room generated"
-            LAST_RULE_TYPE = "consequence"
+            return [
+                {
+                    "type": "event",
+                    "text": (
+                        "The player tried to move, "
+                        "but no exit is established in that direction."
+                    )
+                }
+            ]
 
         extra_candidates.append(
             {
