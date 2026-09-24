@@ -960,7 +960,8 @@ try:
             and not interaction_supported(
                 target,
                 action,
-                build_entity_state(state["facts"]).get(target, {})
+                build_entity_state(state["facts"]).get(target, {}),
+                build_entity_state(state["facts"]).get("player", {}).get("whereabouts")
             )
         ):
             entity_data = get_entity_data(target, {})

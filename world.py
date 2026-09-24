@@ -179,7 +179,7 @@ def get_entity_data(entity_id, entity_state=None):
         "icon": definition.get("icon"),
     }
 
-def interaction_supported(entity_id, action, entity_state=None):
+def interaction_supported(entity_id, action, entity_state=None, player_whereabouts=None):
     definition = ENTITY_DEFINITIONS.get(entity_id, {})
     interactions = definition.get("interactions", [])
 
@@ -188,6 +188,17 @@ def interaction_supported(entity_id, action, entity_state=None):
 
     entity_state = entity_state or {}
     whereabouts = entity_state.get("whereabouts")
+
+    if action == "take":
+        if whereabouts == "held by player":
+            return True
+
+        return (
+            isinstance(whereabouts, str)
+            and whereabouts.startswith("in the ")
+            and bool(whereabouts[len("in the "):].strip())
+            and whereabouts == player_whereabouts
+        )
 
     if action == "drop":
         return whereabouts == "held by player"
