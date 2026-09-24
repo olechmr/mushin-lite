@@ -1,4 +1,5 @@
 import json
+from world import build_entity_state
 
 ACTION_ALIASES = {
     "go": "move",
@@ -26,15 +27,14 @@ ACTION_ALIASES = {
 }
 
 def current_player_room(facts):
-    for fact in reversed(facts):
-        text = fact.get("text", fact) if isinstance(fact, dict) else fact
-        text = text.lower().strip().rstrip(".")
+    whereabouts = build_entity_state(facts).get("player", {}).get("whereabouts")
 
-        if text.startswith("the player is in the "):
-            return text.replace("the player is in the ", "").strip()
-
-        if text.startswith("player is in "):
-            return text.replace("player is in ", "").strip()
+    if (
+        isinstance(whereabouts, str)
+        and whereabouts.startswith("in the ")
+        and bool(whereabouts[len("in the "):].strip())
+    ):
+        return whereabouts[len("in the "):]
 
     return None
 
