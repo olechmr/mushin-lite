@@ -9,7 +9,12 @@ def slot_value(slot, text):
         if " is on the ground" in text:
             return "on the ground"
 
-        if " is holding " in text:
+        if text.lower().startswith((
+            "the player is holding ",
+            "player is holding ",
+            "the user is holding ",
+            "user is holding ",
+        )):
             return "held by player"
 
         if " is in the " in text:
