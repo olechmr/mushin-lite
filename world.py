@@ -201,7 +201,12 @@ def interaction_supported(entity_id, action, entity_state=None, player_whereabou
         )
 
     if action == "drop":
-        return whereabouts == "held by player"
+        return (
+            whereabouts == "held by player"
+            and isinstance(player_whereabouts, str)
+            and player_whereabouts.startswith("in the ")
+            and bool(player_whereabouts[len("in the "):].strip())
+        )
 
     if action in ["light", "extinguish"]:
         return whereabouts == "held by player"
