@@ -931,9 +931,9 @@ try:
 
             continue
 
-        response, candidates = chat(user_input, state["facts"])
+        packet = chat(user_input, state["facts"])
         
-        packet = normalize_packet(llm_adapter.LAST_PACKET)
+        packet = normalize_packet(packet)
 
         action = packet.get("action", "")
         target = packet.get("target", "")
@@ -989,13 +989,7 @@ try:
                 f"{rules.LAST_RULE}"
             )
 
-        if packet_candidates:
-            candidates = packet_candidates
-
-        elif packet.get("action") in ["none", "unknown"] or packet.get("target") in ["none", "unknown"]:
-            candidates = []
-
-        for candidate in candidates:
+        for candidate in packet_candidates:
 
             add_fact(
                 state,
