@@ -1,5 +1,5 @@
 import hashlib
-from canon import fact_slot
+from canon import fact_slot, normalize_fact
 
 OBSERVATION_DISCOVERIES = [
     {
@@ -312,7 +312,7 @@ def collapse_observation(
 
         already_present = any(
             fact.get("status", "active") == "active"
-            and fact.get("text") == candidate_fact
+            and normalize_fact(fact["text"]) == normalize_fact(candidate_fact)
             for fact in facts
         )
 
