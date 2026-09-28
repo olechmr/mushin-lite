@@ -1,4 +1,5 @@
 import hashlib
+from canon import fact_slot
 
 OBSERVATION_DISCOVERIES = [
     {
@@ -296,6 +297,18 @@ def collapse_observation(
             continue
 
         candidate_fact = reveal["text"]
+        candidate_slot = fact_slot(candidate_fact, reveal.get("type", "state"))
+
+        if (
+            candidate_slot is not None
+            and candidate_slot.startswith("whereabouts:")
+            and any(
+                fact.get("status", "active") == "active"
+                and fact_slot(fact["text"], fact.get("type", "state")) == candidate_slot
+                for fact in facts
+            )
+        ):
+            continue
 
         already_present = any(
             fact.get("status", "active") == "active"
