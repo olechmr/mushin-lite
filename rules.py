@@ -240,18 +240,6 @@ def apply_rules(packet, candidates, world, world_state):
             }
         ]
 
-    if action == "light" and target == "lantern":
-
-        LAST_RULE = "lighting lantern illuminates room"
-        LAST_RULE_TYPE = "consequence"
-
-        extra_candidates.append(
-            {
-                "type": "state",
-                "text": "The room is illuminated."
-            }
-        )
-
     if action == "open" and target == "door":
 
         LAST_RULE = "opening door makes passage available"
