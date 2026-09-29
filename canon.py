@@ -246,7 +246,13 @@ def add_fact(state, fact_text, fact_type="state"):
 
         normalized_existing = normalize_fact(fact["text"])
 
-        if normalized_existing == normalized_new:
+        if (
+            normalized_existing == normalized_new
+            and (
+                fact_type != "collapse"
+                or fact.get("type") == "collapse"
+            )
+        ):
             return False
 
         existing_slot = fact_slot(
