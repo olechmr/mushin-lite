@@ -255,6 +255,11 @@ def add_fact(state, fact_text, fact_type="state"):
         ):
             return False
 
+    for fact in state["facts"]:
+
+        if fact.get("status", "active") != "active":
+            continue
+
         existing_slot = fact_slot(
             fact["text"],
             fact.get("type", "state")
