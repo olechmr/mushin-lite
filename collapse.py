@@ -166,6 +166,7 @@ def is_observation_collapsed(
 
     return any(
         fact.get("status", "active") == "active"
+        and fact.get("type") == "collapse"
         and fact.get("text", "").lower().strip().rstrip(".")
         == marker.lower().strip().rstrip(".")
         for fact in facts
