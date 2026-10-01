@@ -102,7 +102,7 @@ def format_presentation(ctx):
     elif action == "light":
         data["movement"] = f"You try to light the {target}."
     elif action == "extinguish":
-        data["movement"] = f"You extinguish the {target}."
+        data["movement"] = f"You try to extinguish the {target}."
     else:
         data["movement"] = f"You act: {ctx['user_input']}"
 
