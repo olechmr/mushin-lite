@@ -94,7 +94,7 @@ def format_presentation(ctx):
     elif action == "take":
         data["movement"] = f"You try to take the {target}."
     elif action == "drop":
-        data["movement"] = f"You drop the {target}."
+        data["movement"] = f"You try to drop the {target}."
     elif action == "open":
         data["movement"] = f"You try to open the {target}."
     elif action == "close":
