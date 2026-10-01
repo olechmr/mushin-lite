@@ -112,7 +112,7 @@ def build_world_state(facts):
 
         text = fact["text"].strip().rstrip(".")
 
-        if " is unavailable" in text:
+        if " is unavailable" in text.lower():
             value = "unavailable"
         elif " is available" in text:
             value = "available"
