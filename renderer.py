@@ -92,7 +92,7 @@ def format_presentation(ctx):
     if action in ["go", "move", "walk", "enter"]:
         data["movement"] = f"You are in the {room_name}."
     elif action == "take":
-        data["movement"] = f"You take the {target}."
+        data["movement"] = f"You try to take the {target}."
     elif action == "drop":
         data["movement"] = f"You drop the {target}."
     elif action == "open":
