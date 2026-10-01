@@ -992,13 +992,12 @@ try:
 
         for candidate in packet_candidates:
 
-            add_fact(
+            if add_fact(
                 state,
                 candidate["text"],
                 candidate["type"]
-            )
-
-            print(f'[debug saved] [{candidate["type"]}] {candidate["text"]}')
+            ):
+                print(f'[debug saved] [{candidate["type"]}] {candidate["text"]}')
 
         ctx = build_presentation_context(
             user_input,
