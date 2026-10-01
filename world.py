@@ -31,7 +31,7 @@ def slot_value(slot, text):
 
     if slot.startswith("broken_state:"):
 
-        if text.endswith(" is broken"):
+        if text.lower().endswith(" is broken"):
             return "broken"
 
     if slot.startswith("inverted_state:"):
