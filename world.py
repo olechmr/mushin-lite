@@ -26,7 +26,7 @@ def slot_value(slot, text):
         if text.lower().endswith(" is open"):
             return "open"
 
-        if text.endswith(" is closed"):
+        if text.lower().endswith(" is closed"):
             return "closed"
 
     if slot.startswith("broken_state:"):
