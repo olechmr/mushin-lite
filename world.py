@@ -220,6 +220,9 @@ def interaction_supported(entity_id, action, entity_state=None, player_whereabou
         )
 
     if action == "light":
-        return whereabouts == "held by player"
+        return (
+            whereabouts == "held by player"
+            and entity_state.get("light_state") in ("lit", "not lit")
+        )
 
     return True
