@@ -314,6 +314,10 @@ def collapse_observation(
         already_present = any(
             fact.get("status", "active") == "active"
             and normalize_fact(fact["text"]) == normalize_fact(candidate_fact)
+            and (
+                reveal.get("type", "state") != "state"
+                or fact.get("type", "state") == "state"
+            )
             for fact in facts
         )
 
