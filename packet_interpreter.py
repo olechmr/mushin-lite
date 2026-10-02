@@ -300,7 +300,7 @@ def recover_embedded_packet(packet):
     if '"target": "umbrella"' in intent:
         recovered["target"] = "umbrella"
 
-    if '"action": "open"' in intent or "attempt to open" in intent:
+    if '"action": "open"' in intent:
         recovered["action"] = "open"
 
     if (
