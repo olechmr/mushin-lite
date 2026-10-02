@@ -316,7 +316,7 @@ def recover_embedded_packet(packet):
     elif '"target": "south"' in intent or "southward" in intent:
         recovered["target"] = "south"
 
-    elif '"action": "close"' in intent or "attempt to close" in intent:
+    elif '"action": "close"' in intent:
         recovered["action"] = "close"
 
     elif '"action": "break"' in intent or "destroy" in intent:
