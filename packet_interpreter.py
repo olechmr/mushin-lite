@@ -100,7 +100,7 @@ def normalize_packet(packet):
                 packet["action"] = "light"
                 return packet
 
-        if (
+        if action in ("extinguish", "none", "unknown", "use") and (
             action in ["extinguish", "put out", "snuff", "douse", "off", "turn off"]
             or "extinguish" in intent
             or "put out" in intent
