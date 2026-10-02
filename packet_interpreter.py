@@ -310,7 +310,7 @@ def recover_embedded_packet(packet):
     ):
         recovered["action"] = "move"
 
-    if '"target": "north"' in intent or "northward" in intent:
+    if '"target": "north"' in intent:
         recovered["target"] = "north"
 
     elif '"target": "south"' in intent or "southward" in intent:
