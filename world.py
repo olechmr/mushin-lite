@@ -194,7 +194,7 @@ def interaction_supported(entity_id, action, entity_state=None, player_whereabou
     entity_state = entity_state or {}
     whereabouts = entity_state.get("whereabouts")
 
-    if action == "close" and entity_state.get("open_state") not in ("open", "closed"):
+    if action in ("open", "close") and entity_state.get("open_state") not in ("open", "closed"):
         return False
 
     if action in ["take", "open", "close"]:
