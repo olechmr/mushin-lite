@@ -89,7 +89,7 @@ def normalize_packet(packet):
             packet["target"] = direction
             target = direction
 
-        if target == "lantern" and action != "extinguish":
+        if target == "lantern" and action in ("light", "none", "unknown", "use"):
             if (
                 action in ["light", "lit", "ignite", "activate", "on", "turn on"]
                 or "light" in intent
