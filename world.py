@@ -44,7 +44,7 @@ def slot_value(slot, text):
         if text.endswith(" is not lit"):
             return "not lit"
 
-        if text.endswith(" is lit"):
+        if text.lower().endswith(" is lit"):
             return "lit"
 
     return text
