@@ -252,6 +252,10 @@ def add_fact(state, fact_text, fact_type="state"):
                 fact_type != "collapse"
                 or fact.get("type") == "collapse"
             )
+            and (
+                fact_type != "state"
+                or fact.get("type", "state") == "state"
+            )
         ):
             return False
 
