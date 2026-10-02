@@ -41,7 +41,7 @@ def slot_value(slot, text):
 
     if slot.startswith("light_state:"):
 
-        if text.endswith(" is not lit"):
+        if text.lower().endswith(" is not lit"):
             return "not lit"
 
         if text.lower().endswith(" is lit"):
