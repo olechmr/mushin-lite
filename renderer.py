@@ -45,7 +45,10 @@ def build_presentation_context(user_input, packet, facts):
 
         "entities": present,
         "exits": exits,
-        "facts": facts,
+        "facts": [
+            fact for fact in facts
+            if fact.get("status", "active") == "active"
+        ],
     }
 
 def entity_base_name(entity):
