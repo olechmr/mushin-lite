@@ -318,7 +318,7 @@ def recover_embedded_packet(packet):
     elif '"action": "close"' in intent:
         recovered["action"] = "close"
 
-    elif '"action": "break"' in intent or "destroy" in intent:
+    elif '"action": "break"' in intent:
         recovered["action"] = "break"
 
     for obj in ["umbrella", "book", "door", "lantern"]:
