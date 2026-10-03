@@ -306,7 +306,6 @@ def recover_embedded_packet(packet):
     if (
         '"action": "move"' in intent
         or '"action": "go"' in intent
-        or "traverse" in intent
     ):
         recovered["action"] = "move"
 
