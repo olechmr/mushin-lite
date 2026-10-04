@@ -956,7 +956,6 @@ try:
         if (
             action not in movement_actions
             and action not in system_actions
-            and target not in ["none", "unknown", ""]
             and not interaction_supported(
                 target,
                 action,
