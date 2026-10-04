@@ -169,7 +169,6 @@ def has_active_fact(facts, text):
     return False
 
 def facts_from_packet(packet, facts=None):
-    packet = normalize_packet(packet)
 
     facts = facts or []
 
