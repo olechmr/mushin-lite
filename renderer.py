@@ -107,7 +107,7 @@ def format_presentation(ctx):
     elif action == "extinguish":
         data["movement"] = f"You try to extinguish the {target}."
     else:
-        data["movement"] = f"You act: {ctx['user_input']}"
+        data["movement"] = f"You are in the {room_name}."
 
     entities = ctx["entities"]
 
