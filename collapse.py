@@ -1,5 +1,8 @@
 import hashlib
+import random
 from canon import fact_slot, normalize_fact
+
+_collapse_rng = random.Random()
 
 OBSERVATION_DISCOVERIES = [
     {
@@ -116,6 +119,7 @@ def select_candidate(
     room_id,
     observation_space,
     verb="search",
+    rng=None,
 ):
 
     seed_text = "|".join([
@@ -135,8 +139,8 @@ def select_candidate(
         return None
 
     roll = (
-        int(digest, 16)
-        / ((1 << 256) - 1)
+        rng.random() if rng is not None else
+        int(digest, 16) / ((1 << 256) - 1)
     ) * total_weight
 
     cumulative_weight = 0.0
@@ -332,6 +336,7 @@ def collapse_observation(
         room_id,
         observation_space,
         verb,
+        rng=_collapse_rng,
     )
 
     if selected is None:
