@@ -89,10 +89,12 @@ def format_presentation(ctx):
 
     if not room_id:
         return {
-            "movement": "You are somewhere uncertain."
+            "movement": ctx.get("rule_block_text") or "You are somewhere uncertain."
         }
 
-    if action in ["go", "move", "walk", "enter"]:
+    if ctx.get("rule_block_text"):
+        data["movement"] = ctx["rule_block_text"]
+    elif action in ["go", "move", "walk", "enter"]:
         data["movement"] = f"You are in the {room_name}."
     elif ctx.get("committed_states"):
         data["movement"] = " ".join(ctx["committed_states"])

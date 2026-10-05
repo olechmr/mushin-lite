@@ -983,6 +983,15 @@ try:
             world_state
         )
 
+        rule_block_text = None
+
+        if rules.LAST_RULE_TYPE == "block":
+            rule_block_text = " ".join(
+                candidate["text"]
+                for candidate in packet_candidates
+                if candidate["type"] == "event"
+            )
+
         if rules.LAST_RULE:
             print(
                 f"[rule {rules.LAST_RULE_TYPE}] "
@@ -1013,6 +1022,8 @@ try:
             fact["text"] for fact in committed_states
             if fact.get("status", "active") == "active"
         ]
+
+        ctx["rule_block_text"] = rule_block_text
 
         presentation = format_presentation(ctx)
         scene = render_presentation_sentences(presentation)
