@@ -161,6 +161,15 @@ ENTITY_DEFINITIONS = {
         "interactions": ["take", "drop", "light", "extinguish"],
         "icon": "🏮",
     },
+    "brass key": {
+        "interactions": ["take", "drop"],
+    },
+    "letter opener": {
+        "interactions": ["take", "drop"],
+    },
+    "ink bottle": {
+        "interactions": ["take", "drop"],
+    },
     "player": {
         "display_name": "Player",
         "tags": ["player"],
