@@ -174,11 +174,15 @@ Schema:
 
         response.raise_for_status()
 
+        if DEBUG_LOCAL_PACKETS:
+            print(f"[local HTTP response for {user_input!r}: {response.text!r}]")
+
         data = response.json()
 
         raw_text = data.get("response", "").strip()
 
-        #print(f"[raw local response: {raw_text}]")
+        if DEBUG_LOCAL_PACKETS:
+            print(f"[local JSON parse input: {raw_text!r}]")
 
         try:
             parsed = json.loads(raw_text)
