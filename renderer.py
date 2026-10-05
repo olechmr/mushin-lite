@@ -94,6 +94,8 @@ def format_presentation(ctx):
 
     if action in ["go", "move", "walk", "enter"]:
         data["movement"] = f"You are in the {room_name}."
+    elif ctx.get("committed_states"):
+        data["movement"] = " ".join(ctx["committed_states"])
     elif action == "take":
         data["movement"] = f"You try to take the {target}."
     elif action == "drop":

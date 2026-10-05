@@ -989,6 +989,8 @@ try:
                 f"{rules.LAST_RULE}"
             )
 
+        committed_states = []
+
         for candidate in packet_candidates:
 
             if add_fact(
@@ -996,6 +998,9 @@ try:
                 candidate["text"],
                 candidate["type"]
             ):
+                if candidate["type"] == "state":
+                    committed_states.append(state["facts"][-1])
+
                 print(f'[debug saved] [{candidate["type"]}] {candidate["text"]}')
 
         ctx = build_presentation_context(
@@ -1003,6 +1008,11 @@ try:
             packet,
             state["facts"]
         )
+
+        ctx["committed_states"] = [
+            fact["text"] for fact in committed_states
+            if fact.get("status", "active") == "active"
+        ]
 
         presentation = format_presentation(ctx)
         scene = render_presentation_sentences(presentation)
