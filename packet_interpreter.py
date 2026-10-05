@@ -263,6 +263,18 @@ def facts_from_packet(packet, facts=None):
     return candidates
 
 def recover_embedded_packet(packet):
+    def is_missing(value):
+        return value is None or (
+            isinstance(value, str)
+            and value.strip().lower() in ("", "none", "unknown")
+        )
+
+    action_missing = is_missing(packet.get("action"))
+    target_missing = is_missing(packet.get("target"))
+
+    if not action_missing and not target_missing:
+        return packet
+
     intent = packet.get("intent", "")
 
     if isinstance(intent, str):
@@ -277,13 +289,24 @@ def recover_embedded_packet(packet):
                     target = recovered.get("target")
 
                     if action and target:
-                        packet["action"] = action
-                        packet["target"] = target
-                        packet["intent"] = recovered.get("intent", intent)
-                        packet["confidence"] = recovered.get(
-                            "confidence",
-                            packet.get("confidence", "medium")
-                        )
+                        filled = False
+
+                        if action_missing and not is_missing(action):
+                            packet["action"] = action
+                            filled = True
+
+                        if target_missing and not is_missing(target):
+                            packet["target"] = target
+                            filled = True
+
+                        if filled:
+                            packet["intent"] = recovered.get("intent", intent)
+                            if is_missing(packet.get("confidence")):
+                                packet["confidence"] = recovered.get(
+                                    "confidence",
+                                    packet.get("confidence", "medium")
+                                )
+
                         return packet
 
             except json.JSONDecodeError:
@@ -327,5 +350,11 @@ def recover_embedded_packet(packet):
     for act in ["open", "close", "take", "drop", "break", "light", "extinguish", "move"]:
         if f'"action": "{act}"' in intent:
             recovered["action"] = act
+
+    if not action_missing:
+        recovered["action"] = packet["action"]
+
+    if not target_missing:
+        recovered["target"] = packet["target"]
 
     return recovered
