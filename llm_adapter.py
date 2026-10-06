@@ -178,9 +178,6 @@ Schema:
 
         raw_text = data.get("response", "").strip()
 
-        if DEBUG_LOCAL_PACKETS:
-            print(f"[local JSON parse input: {raw_text!r}]")
-
         try:
             parsed = json.loads(raw_text)
 
