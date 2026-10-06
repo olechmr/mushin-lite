@@ -174,9 +174,6 @@ Schema:
 
         response.raise_for_status()
 
-        if DEBUG_LOCAL_PACKETS:
-            print(f"[local HTTP response for {user_input!r}: {response.text!r}]")
-
         data = response.json()
 
         raw_text = data.get("response", "").strip()
