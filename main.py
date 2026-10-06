@@ -3,7 +3,7 @@ import llm_adapter
 from llm_adapter import chat, EXTRACTION_MODE
 from packet_interpreter import facts_from_packet, normalize_packet
 from rules import apply_rules
-from world import slot_value, build_entity_state, build_world_state, entities_in_room, get_entity_data, interaction_supported
+from world import slot_value, build_entity_state, build_world_state, entities_in_room, get_entity_data, interaction_supported, resolve_entity_reference
 import map_data
 from map_data import load_map, reset_map
 from collapse import (
@@ -937,6 +937,27 @@ try:
 
         action = packet.get("action", "")
         target = packet.get("target", "")
+
+        if action in ("take", "drop", "open", "close", "light", "extinguish"):
+            entities = build_entity_state(state["facts"])
+            resolved_target = resolve_entity_reference(
+                target,
+                entities,
+                entities.get("player", {}).get("whereabouts")
+            )
+
+            if resolved_target is None:
+                entity_data = get_entity_data(target, {})
+                display_name = entity_data.get("display_name", target)
+
+                print()
+                print(f"You can't {action} the {display_name}.")
+                print()
+                continue
+
+            packet = dict(packet)
+            packet["target"] = resolved_target
+            target = resolved_target
 
         movement_actions = ["go", "move", "walk", "enter"]
         system_actions = ["none"]

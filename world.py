@@ -193,6 +193,47 @@ def get_entity_data(entity_id, entity_state=None):
         "icon": definition.get("icon"),
     }
 
+def resolve_entity_reference(reference, entities, player_whereabouts):
+    if not isinstance(reference, str):
+        return None
+
+    reference = reference.strip().lower()
+
+    if reference in ("", "none", "unknown"):
+        return None
+
+    player_room_known = (
+        isinstance(player_whereabouts, str)
+        and player_whereabouts.startswith("in the ")
+        and bool(player_whereabouts[len("in the "):].strip())
+    )
+
+    accessible = [
+        entity_id
+        for entity_id, entity_state in entities.items()
+        if entity_id != "player"
+        and (
+            entity_state.get("whereabouts") == "held by player"
+            or (
+                player_room_known
+                and entity_state.get("whereabouts") == player_whereabouts
+            )
+        )
+    ]
+
+    if reference in entities or reference in ENTITY_DEFINITIONS:
+        return reference if reference in accessible else None
+
+    reference_tokens = reference.split()
+    matches = [
+        entity_id
+        for entity_id in accessible
+        if entity_id.split()[-len(reference_tokens):] == reference_tokens
+    ]
+
+    return matches[0] if len(matches) == 1 else None
+
+
 def interaction_supported(entity_id, action, entity_state=None, player_whereabouts=None):
     definition = ENTITY_DEFINITIONS.get(entity_id, {})
     interactions = definition.get("interactions", [])
