@@ -10,8 +10,12 @@ ACTION_ALIASES = {
     "pick": "take",
     "pick up": "take",
     "grab": "take",
+    "acquire": "take",
 
     "put down": "drop",
+    "discard": "drop",
+    "set down": "drop",
+    "place down": "drop",
 
     "ignite": "light",
     "lit": "light",
