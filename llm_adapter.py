@@ -19,7 +19,7 @@ EXTRACTION_MODE = "local"  # "cloud" or "local"
 
 LOCAL_CONDITIONING_ENABLED = True
 LOCAL_MODEL = "mistral:latest"
-LOCAL_URL = "http://192.168.0.18:11434/api/generate"
+LOCAL_URL = "http://192.168.0.11:11434/api/generate"
 
 DEBUG_LOCAL_PACKETS = True
 LOCAL_PACKET_LOG = "local_packets.log"
@@ -347,7 +347,7 @@ Return only the rewritten paragraph.
         import requests
 
         response = requests.post(
-            "http://192.168.0.18:11434/api/generate",
+            LOCAL_URL,
             json={
                 "model": "mistral:latest",
                 "prompt": prompt,
