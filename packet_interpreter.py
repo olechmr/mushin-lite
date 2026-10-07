@@ -30,6 +30,11 @@ ACTION_ALIASES = {
     "off": "extinguish",
 }
 
+SPLIT_ACTION_PHRASES = {
+    ("set", "down"): "set down",
+    ("place", "down"): "place down",
+}
+
 def current_player_room(facts):
     whereabouts = build_entity_state(facts).get("player", {}).get("whereabouts")
 
@@ -80,6 +85,7 @@ def normalize_packet(packet):
     intent = packet.get("intent", "").lower().strip()
     target = packet.get("target", "").lower().strip()
 
+    action = SPLIT_ACTION_PHRASES.get((action, intent), action)
     action = ACTION_ALIASES.get(action, action)
     packet["action"] = action
 
