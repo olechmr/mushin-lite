@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 import re
 
 STATE_FILE = "state.json"
@@ -14,12 +15,43 @@ def load_state():
         if "status" not in fact:
             fact["status"] = "active"
 
+    state.setdefault("npc", empty_npc_state())
+    validate_npc_state(state["npc"])
+
     return state
 
 def save_state(state):
 
+    if "npc" in state:
+        validate_npc_state(state["npc"])
+
     with open(STATE_FILE, "w") as f:
         json.dump(state, f, indent=2)
+
+
+def empty_npc_state():
+    """No NPCs or historical episodes are inferred when migrating an old save."""
+    return {"version": 1, "entities": {}, "episodes": {}, "resolutions": {}}
+
+
+def validate_npc_state(npc):
+    """Validate the storage envelope; behavior validates episode constraints."""
+    if not isinstance(npc, dict) or type(npc.get("version")) is not int or npc["version"] != 1:
+        raise ValueError("Unsupported NPC state version")
+    if any(not isinstance(npc.get(key), dict) for key in ("entities", "episodes", "resolutions")):
+        raise ValueError("Invalid NPC state namespace")
+
+
+def reset_npc_state(state, foundation=None):
+    """Explicitly replace NPC state only; omit foundation to clear it.
+
+    Pass npc_fixture.build_npc_fixture() to install the isolated prototype.
+    This is setup/reset, not an interaction commitment operation.
+    """
+    npc = empty_npc_state() if foundation is None else deepcopy(foundation)
+    validate_npc_state(npc)
+    state["npc"] = npc
+    save_state(state)
 
 
 def normalize_fact(text):
@@ -306,6 +338,7 @@ def forget_all(state):
 
     state["facts"] = []
     state["next_fact_id"] = 1
+    state["npc"] = empty_npc_state()
 
     save_state(state)
 
