@@ -269,12 +269,6 @@ def recover_embedded_packet(packet):
 
     recovered = dict(packet)
 
-    if '"target": "umbrella"' in intent:
-        recovered["target"] = "umbrella"
-
-    if '"action": "open"' in intent:
-        recovered["action"] = "open"
-
     if (
         '"action": "move"' in intent
         or '"action": "go"' in intent
@@ -286,12 +280,6 @@ def recover_embedded_packet(packet):
 
     elif '"target": "south"' in intent:
         recovered["target"] = "south"
-
-    elif '"action": "close"' in intent:
-        recovered["action"] = "close"
-
-    elif '"action": "break"' in intent:
-        recovered["action"] = "break"
 
     for obj in ["umbrella", "book", "door", "lantern"]:
         if f'"target": "{obj}"' in intent:
