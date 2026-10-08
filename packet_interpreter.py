@@ -120,10 +120,6 @@ def normalize_packet(packet):
             packet["action"] = "extinguish"
             return packet
 
-    if action == "go":
-        packet["action"] = "move"
-        action = "move"
-
     if action == "use":
 
         if any(word in intent for word in [
