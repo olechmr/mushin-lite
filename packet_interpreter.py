@@ -210,9 +210,6 @@ def facts_from_packet(packet, facts=None):
             }
         )
 
-    elif action == "move":
-        pass
-
     return candidates
 
 def recover_embedded_packet(packet):
