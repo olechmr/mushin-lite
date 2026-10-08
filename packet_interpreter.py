@@ -253,20 +253,6 @@ def facts_from_packet(packet, facts=None):
             }
         )
 
-    elif action == "extinguish":
-        candidates.append(
-            {
-                "type": "event",
-                "text": f"The player extinguished the {target}."
-            }
-        )
-        candidates.append(
-            {
-                "type": "state",
-                "text": f"The {target} is not lit."
-            }
-        )
-
     elif action == "move":
         pass
 
