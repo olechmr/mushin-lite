@@ -149,15 +149,6 @@ def normalize_packet(packet):
         elif "use" in intent and "broken" in intent:
             packet["action"] = "open"
 
-    if action in ["put out", "douse", "snuff"]:
-        packet["action"] = "extinguish"
-
-    elif (
-        action in ["none", "unknown", "use"]
-        and ("extinguish" in intent or "put out" in intent or "not lit" in intent)
-    ):
-        packet["action"] = "extinguish"
-
     return packet
 
 def has_active_fact(facts, text):
