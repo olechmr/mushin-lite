@@ -76,48 +76,6 @@ def apply_rules(packet, candidates, world, world_state):
             }
         ]
 
-    if action == "take":
-
-        obj_whereabouts = obj_state.get("whereabouts")
-
-        if obj_whereabouts and obj_whereabouts.startswith("in the "):
-
-            player_location = world.get("player", {}).get("whereabouts")
-
-            if player_location and obj_whereabouts != player_location:
-
-                LAST_RULE = "object not present"
-                LAST_RULE_TYPE = "block"
-
-                return [
-                    {
-                        "type": "event",
-                        "text": f"The player tried to take the {target}, but it is not here."
-                    }
-                ]
-
-    if action in ["inspect", "examine", "look"]:
-
-        obj_whereabouts = obj_state.get("whereabouts")
-        player_location = world.get("player", {}).get("whereabouts")
-
-        if (
-            obj_whereabouts
-            and obj_whereabouts.startswith("in the ")
-            and player_location
-            and obj_whereabouts != player_location
-        ):
-
-            LAST_RULE = "object not visible"
-            LAST_RULE_TYPE = "block"
-
-            return [
-                {
-                    "type": "event",
-                    "text": f"The player tried to inspect the {target}, but it is not here."
-                }
-            ]
-
     if action == "drop" and obj_state.get("whereabouts") == "on the ground":
 
         LAST_RULE = "already on ground"
