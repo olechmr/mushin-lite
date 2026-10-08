@@ -1,4 +1,4 @@
-from canon import load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
+from canon import commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
 import llm_adapter
 from llm_adapter import chat, EXTRACTION_MODE
 from packet_interpreter import facts_from_packet, normalize_packet
@@ -8,6 +8,7 @@ import map_data
 from map_data import load_map, reset_map
 from collapse import (
     collapse_observation,
+    collapse_npc_episode,
     preview_observation,
 )
 import textwrap
@@ -118,6 +119,7 @@ HELP_SECTIONS = {
     "Testing": [
         ("/setup", "paste session setup"),
         ("/testreset", "reset canon and map to test fixture"),
+        ("/npcresolve <episode_id>", "resolve an installed NPC episode (developer)"),
     ],
 
     "General": [
@@ -134,6 +136,21 @@ def show_help():
             print(f"  {command:<22} {description}")
 
         print()
+
+def handle_npc_resolve(state, episode_id, rng=None):
+    """Developer diagnostics only; never installs a fixture or invokes the model."""
+    proposal = collapse_npc_episode(state.get("npc"), episode_id, rng=rng)
+    diagnostic = {key: value for key, value in proposal.items() if key != "basis"}
+    diagnostic["committed"] = False
+    if proposal["outcome"] is not None and not proposal["reused"]:
+        try:
+            result = commit_npc_resolution(state, proposal)
+            diagnostic.update(committed=result["committed"], reused=result["reused"])
+        except (ValueError, OSError) as error:
+            diagnostic["error"] = str(error)
+    print(json.dumps(diagnostic, indent=2, sort_keys=True))
+    return diagnostic
+
 
 def handle_observation_command(
     state,
@@ -281,6 +298,14 @@ try:
 
             print()
             show_help()
+            continue
+
+        if user_input == "/npcresolve" or user_input.startswith("/npcresolve "):
+            parts = user_input.split()
+            if len(parts) != 2:
+                print("Usage: /npcresolve <episode_id>")
+            else:
+                handle_npc_resolve(state, parts[1])
             continue
 
         if user_input == "/setup":

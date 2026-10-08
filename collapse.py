@@ -1,8 +1,13 @@
 import hashlib
 import random
+import math
+from copy import deepcopy
+from types import SimpleNamespace
+from behavior import OUTCOMES, evaluate_episode
 from canon import fact_slot, normalize_fact
 
 _collapse_rng = random.Random()
+_npc_rng = random.Random()
 
 OBSERVATION_DISCOVERIES = [
     {
@@ -358,3 +363,69 @@ def collapse_observation(
         )
 
     return results
+
+
+def collapse_npc_episode(npc, episode_id, rng=None):
+    """Propose an outcome without mutation or persistence; existing truth wins."""
+    result = {
+        "episode_id": episode_id, "feasibility": "unresolved", "outcome": None,
+        "sampled": False, "reused": False, "reasons": [],
+    }
+    if (
+        not isinstance(npc, dict)
+        or type(npc.get("version")) is not int or npc["version"] != 1
+        or not isinstance(episode_id, str)
+        or any(not isinstance(npc.get(k), dict) for k in ("entities", "episodes", "resolutions"))
+        or episode_id not in npc["episodes"]
+    ):
+        result["reasons"] = ["invalid_npc_state_or_episode"]
+        return result
+    if episode_id in npc["resolutions"]:
+        resolution = npc["resolutions"][episode_id]
+        if not isinstance(resolution, dict) or resolution.get("outcome") not in OUTCOMES:
+            result["reasons"] = ["invalid_existing_resolution"]
+            return result
+        result.update(feasibility="resolved", outcome=resolution["outcome"], reused=True,
+                      reasons=["already_resolved"])
+        return result
+
+    evaluation = evaluate_episode(npc, episode_id)
+    result.update(feasibility=evaluation["feasibility"], reasons=evaluation["reasons"][:])
+    if evaluation["feasibility"] == "unresolved":
+        return result
+    if evaluation["feasibility"] == "impossible":
+        result.update(outcome="no_interaction", basis=deepcopy(npc))
+        return result
+    if evaluation["feasibility"] != "possible":
+        result.update(feasibility="unresolved", reasons=["invalid_evaluation"])
+        return result
+
+    allowed, weights = evaluation["allowed_outcomes"], evaluation["weights"]
+    if (
+        not isinstance(allowed, list) or not allowed
+        or any(outcome not in OUTCOMES for outcome in allowed)
+        or len(set(allowed)) != len(allowed)
+        or not isinstance(weights, dict) or set(weights) != set(allowed)
+        or any(type(w) not in (int, float) or w < 0 for w in weights.values())
+    ):
+        result.update(feasibility="unresolved", reasons=["invalid_distribution"])
+        return result
+    try:
+        total = sum(weights.values())
+        valid = all(math.isfinite(w) for w in weights.values()) and math.isfinite(total) and total > 0
+    except OverflowError:
+        valid = False
+    if not valid:
+        result.update(feasibility="unresolved", reasons=["invalid_distribution"])
+        return result
+    roll = (rng if rng is not None else _npc_rng).random()
+    result["sampled"] = True
+    if type(roll) not in (int, float) or not 0 <= roll < 1:
+        result.update(feasibility="unresolved", reasons=["invalid_random_draw"])
+        return result
+    candidates = [{"id": outcome, "weight": weights[outcome]}
+                  for outcome in allowed if weights[outcome] > 0]
+    selected = select_candidate(candidates, episode_id, {"id": episode_id},
+                                verb="npc_interaction", rng=SimpleNamespace(random=lambda: roll))
+    result.update(outcome=selected["id"], basis=deepcopy(npc))
+    return result

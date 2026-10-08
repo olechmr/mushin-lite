@@ -18,8 +18,18 @@ def build_npc_fixture():
         },
         "episodes": {
             "fixture_morning": {
+                "display_name": "fixture morning",
                 "participants": ["heidi", "chris"],
                 "window": [0, 1],
+                "allowed_places": {
+                    "heidi": ["study", "foyer"],
+                    "chris": ["study", "hallway"],
+                },
+            },
+            "fixture_afternoon": {
+                "display_name": "fixture afternoon",
+                "participants": ["heidi", "chris"],
+                "window": [1, 2],
                 "allowed_places": {
                     "heidi": ["study", "foyer"],
                     "chris": ["study", "hallway"],

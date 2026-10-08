@@ -1,6 +1,8 @@
 import json
 from copy import deepcopy
 import re
+import os
+import tempfile
 
 STATE_FILE = "state.json"
 
@@ -52,6 +54,75 @@ def reset_npc_state(state, foundation=None):
     validate_npc_state(npc)
     state["npc"] = npc
     save_state(state)
+
+
+def commit_npc_resolution(state, proposal):
+    """Commit one authorized proposal and its event together, keyed by episode ID.
+
+    Existing identical resolutions are no-ops. No event-text lookup determines
+    identity. Validation and disk failure leave the caller's state unchanged.
+    """
+    from behavior import OUTCOMES, evaluate_episode
+
+    npc = state.get("npc")
+    validate_npc_state(npc)
+    episode_id, outcome = proposal.get("episode_id"), proposal.get("outcome")
+    if not isinstance(episode_id, str) or episode_id not in npc["episodes"] or outcome not in OUTCOMES:
+        raise ValueError("Invalid NPC episode or outcome")
+    if episode_id in npc["resolutions"]:
+        existing = npc["resolutions"][episode_id]
+        if not isinstance(existing, dict) or existing.get("outcome") != outcome:
+            raise ValueError("Conflicting NPC resolution")
+        return {"committed": False, "reused": True, "resolution": deepcopy(existing)}
+    if proposal.get("basis") != npc:
+        raise ValueError("Stale or missing NPC proposal basis")
+    evaluation = evaluate_episode(npc, episode_id)
+    feasibility = evaluation["feasibility"]
+    if (
+        proposal.get("feasibility") != feasibility
+        or proposal.get("reused") is not False
+        or feasibility not in ("possible", "impossible")
+        or outcome not in evaluation["allowed_outcomes"]
+        or evaluation["weights"].get(outcome, 0) <= 0
+        or proposal.get("sampled") is not (feasibility == "possible")
+    ):
+        raise ValueError("Unauthorized NPC resolution proposal")
+    episode = npc["episodes"][episode_id]
+    names = [npc["entities"][p].get("display_name") for p in episode["participants"]]
+    label = episode.get("display_name")
+    if any(not isinstance(text, str) or not text.strip() for text in names + [label]):
+        raise ValueError("Missing NPC event metadata")
+    verb = {"conversation": "talked", "disagreement": "argued",
+            "no_interaction": "did not interact"}[outcome]
+    pending = deepcopy(state)
+    fact_id = pending["next_fact_id"]
+    resolution = {"outcome": outcome, "event_id": fact_id}
+    pending["npc"]["resolutions"][episode_id] = resolution
+    pending["facts"].append({
+        "id": fact_id, "type": "event", "status": "active",
+        "text": f"{names[0]} and {names[1]} {verb} during the {label}.",
+    })
+    pending["next_fact_id"] += 1
+    _save_npc_commit(pending)
+    state.update(pending)
+    return {"committed": True, "reused": False, "resolution": deepcopy(resolution)}
+
+
+def _save_npc_commit(state):
+    """One atomic snapshot containing both structured history and its event."""
+    path = os.path.abspath(STATE_FILE)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=os.path.dirname(path),
+                                         prefix=".npc-commit-", delete=False) as handle:
+            temporary = handle.name
+            json.dump(state, handle, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def normalize_fact(text):
