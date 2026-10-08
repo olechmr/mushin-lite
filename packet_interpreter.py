@@ -47,36 +47,6 @@ def current_player_room(facts):
 
     return None
 
-def recover_intent_json(packet):
-    intent = packet.get("intent", "")
-
-    if not isinstance(intent, str):
-        return packet
-
-    text = intent.strip()
-
-    if not text.startswith("{"):
-        return packet
-
-    try:
-        recovered = json.loads(text)
-    except json.JSONDecodeError:
-        return packet
-
-    if not isinstance(recovered, dict):
-        return packet
-
-    action = recovered.get("action")
-    target = recovered.get("target")
-
-    if action and target:
-        packet["action"] = action
-        packet["target"] = target
-        packet["intent"] = recovered.get("intent", intent)
-        packet["confidence"] = recovered.get("confidence", packet.get("confidence", "medium"))
-
-    return packet
-
 def normalize_packet(packet):
     packet = dict(packet)
     packet = recover_embedded_packet(packet)
