@@ -7,13 +7,14 @@ def build_npc_fixture():
     Allowed places are exhaustive permissions throughout the window, not visits
     or exact whereabouts. Empty/missing permissions are unresolved, not absence.
     Irritability is an established disposition in [0, 1], not evidence of a fight.
+    current_room is present availability, never evidence of historical presence.
     Episode IDs uniquely identify a fixed pair and window. Future resolutions
     map those IDs to {"outcome": <outcome ID>} and represent objective truth.
     """
     return {
         "version": 1,
         "entities": {
-            "heidi": {"display_name": "Heidi", "irritability": 0.25},
+            "heidi": {"display_name": "Heidi", "irritability": 0.25, "current_room": "foyer"},
             "chris": {"display_name": "Chris", "irritability": 0.25},
         },
         "episodes": {

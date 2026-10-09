@@ -56,6 +56,22 @@ def reset_npc_state(state, foundation=None):
     save_state(state)
 
 
+def reset_npc_test_fixture(state):
+    """Reset the isolated experiment, including only its keyed historical events."""
+    from npc_fixture import build_npc_fixture
+
+    npc = state.get("npc", empty_npc_state())
+    validate_npc_state(npc)
+    event_ids = {r["event_id"] for r in npc["resolutions"].values()
+                 if isinstance(r, dict) and type(r.get("event_id")) is int}
+    pending = deepcopy(state)
+    pending["facts"] = [f for f in pending["facts"]
+                        if not (f.get("type") == "event" and f.get("id") in event_ids)]
+    pending["npc"] = build_npc_fixture()
+    _save_npc_commit(pending)
+    state.update(pending)
+
+
 def commit_npc_resolution(state, proposal):
     """Commit one authorized proposal and its event together, keyed by episode ID.
 

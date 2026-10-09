@@ -1,4 +1,4 @@
-from canon import commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
+from canon import reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
 import llm_adapter
 from llm_adapter import chat, EXTRACTION_MODE
 from packet_interpreter import facts_from_packet, normalize_packet
@@ -15,6 +15,7 @@ import textwrap
 import json
 import rules
 from renderer import (
+    render_npc_inquiry,
     render_response,
     narrate_state,
     build_presentation_context,
@@ -61,6 +62,7 @@ def normalize_command(user_input):
 
 HELP_SECTIONS = {
     "Player Commands": [
+        ("ask heidi about chris", "ask about the fixture morning"),
         ("look", "examine the current room"),
         ("listen", "listen to your surroundings"),
         ("search", "search the current room"),
@@ -119,6 +121,7 @@ HELP_SECTIONS = {
     "Testing": [
         ("/setup", "paste session setup"),
         ("/testreset", "reset canon and map to test fixture"),
+        ("/npctestreset", "reset the isolated NPC fixture"),
         ("/npcresolve <episode_id>", "resolve an installed NPC episode (developer)"),
     ],
 
@@ -137,8 +140,8 @@ def show_help():
 
         print()
 
-def handle_npc_resolve(state, episode_id, rng=None):
-    """Developer diagnostics only; never installs a fixture or invokes the model."""
+def resolve_npc_episode(state, episode_id, rng=None):
+    """Shared collapse/commit path; proposals alone are never disclosed as truth."""
     proposal = collapse_npc_episode(state.get("npc"), episode_id, rng=rng)
     diagnostic = {key: value for key, value in proposal.items() if key != "basis"}
     diagnostic["committed"] = False
@@ -148,8 +151,44 @@ def handle_npc_resolve(state, episode_id, rng=None):
             diagnostic.update(committed=result["committed"], reused=result["reused"])
         except (ValueError, OSError) as error:
             diagnostic["error"] = str(error)
+    return diagnostic
+
+
+def handle_npc_resolve(state, episode_id, rng=None):
+    """Developer diagnostics only; never installs a fixture or invokes the model."""
+    diagnostic = resolve_npc_episode(state, episode_id, rng=rng)
     print(json.dumps(diagnostic, indent=2, sort_keys=True))
     return diagnostic
+
+
+def handle_npc_inquiry(state, rng=None):
+    """Only the fixed Heidi/Chris morning inquiry; current availability comes first."""
+    npc = state.get("npc", {})
+    entities = npc.get("entities", {}) if isinstance(npc, dict) else {}
+    heidi = entities.get("heidi", {}) if isinstance(entities, dict) else {}
+    room = heidi.get("current_room") if isinstance(heidi, dict) else None
+    player_locations = {
+        slot_value("whereabouts:player", f["text"])
+        for f in state["facts"]
+        if f.get("status", "active") == "active"
+        and fact_slot(f["text"], f.get("type", "state")) == "whereabouts:player"
+    }
+    if (
+        not isinstance(room, str) or not room.strip() or room.lower().strip() in ("none", "unknown")
+        or player_locations != {f"in the {room}"}
+    ):
+        print("Heidi is not available here to answer.")
+        return
+    episodes = npc.get("episodes", {})
+    episode = episodes.get("fixture_morning", {}) if isinstance(episodes, dict) else {}
+    if not isinstance(episode, dict) or episode.get("participants") != ["heidi", "chris"]:
+        print(render_npc_inquiry(None))
+        return
+    result = resolve_npc_episode(state, "fixture_morning", rng=rng)
+    outcome = None
+    if result["committed"] or result["reused"]:
+        outcome = state["npc"]["resolutions"]["fixture_morning"]["outcome"]
+    print(render_npc_inquiry(outcome))
 
 
 def handle_observation_command(
@@ -298,6 +337,15 @@ try:
 
             print()
             show_help()
+            continue
+
+        if user_input == "/npctestreset":
+            reset_npc_test_fixture(state)
+            print("[NPC fixture reset]")
+            continue
+
+        if user_input.lower().strip() == "ask heidi about chris":
+            handle_npc_inquiry(state)
             continue
 
         if user_input == "/npcresolve" or user_input.startswith("/npcresolve "):
