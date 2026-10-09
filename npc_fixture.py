@@ -1,6 +1,21 @@
 """Isolated NPC foundation; never installed by loading a save or an object reset."""
 
 
+# Exact interface bindings only; importing this table does not install state.
+NPC_INQUIRIES = {
+    "ask heidi about chris": {
+        "respondent": "heidi",
+        "other": "chris",
+        "episode_id": "fixture_morning",
+    },
+    "ask chris about heidi this afternoon": {
+        "respondent": "chris",
+        "other": "heidi",
+        "episode_id": "fixture_afternoon",
+    },
+}
+
+
 def build_npc_fixture():
     """Return fresh data. Windows are ordered fixture units, not an engine clock.
 
@@ -15,7 +30,7 @@ def build_npc_fixture():
         "version": 1,
         "entities": {
             "heidi": {"display_name": "Heidi", "irritability": 0.25, "current_room": "foyer"},
-            "chris": {"display_name": "Chris", "irritability": 0.25},
+            "chris": {"display_name": "Chris", "irritability": 0.25, "current_room": "foyer"},
         },
         "episodes": {
             "fixture_morning": {

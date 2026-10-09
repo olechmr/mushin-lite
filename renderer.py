@@ -3,13 +3,16 @@ from collapse import is_observation_collapsed
 import map_data
 import json
 
-def render_npc_inquiry(outcome):
-    """Truthful fixture disclosure from a committed outcome ID only."""
-    return {
-        "conversation": "Heidi says that she and Chris talked during the fixture morning.",
-        "disagreement": "Heidi says that she and Chris argued during the fixture morning.",
-        "no_interaction": "Heidi says that she and Chris did not interact during the fixture morning.",
-    }.get(outcome, "What happened between Heidi and Chris cannot be established.")
+def render_npc_inquiry(outcome, respondent_name, other_name, episode_name):
+    """Truthful disclosure from committed outcome and validated display metadata."""
+    verb = {
+        "conversation": "talked",
+        "disagreement": "argued",
+        "no_interaction": "did not interact",
+    }.get(outcome)
+    if verb is None:
+        return f"What happened between {respondent_name} and {other_name} cannot be established."
+    return f"{respondent_name} says that {respondent_name} and {other_name} {verb} during the {episode_name}."
 
 
 def build_presentation_context(user_input, packet, facts):

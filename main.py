@@ -26,6 +26,7 @@ from renderer import (
     render_presentation_sentences,
 )
 from test_fixture import TEST_FACTS
+from npc_fixture import NPC_INQUIRIES
 
 load_map()
 
@@ -63,6 +64,7 @@ def normalize_command(user_input):
 HELP_SECTIONS = {
     "Player Commands": [
         ("ask heidi about chris", "ask about the fixture morning"),
+        ("ask chris about heidi this afternoon", "ask about the fixture afternoon"),
         ("look", "examine the current room"),
         ("listen", "listen to your surroundings"),
         ("search", "search the current room"),
@@ -161,34 +163,56 @@ def handle_npc_resolve(state, episode_id, rng=None):
     return diagnostic
 
 
-def handle_npc_inquiry(state, rng=None):
-    """Only the fixed Heidi/Chris morning inquiry; current availability comes first."""
+def handle_npc_inquiry(state, inquiry, rng=None):
+    """Execute an explicit binding; validate identity and availability before collapse."""
+    def valid_text(value):
+        return isinstance(value, str) and bool(value.strip()) and value.lower().strip() not in ("none", "unknown")
+
+    unresolved = "The requested interaction cannot be established."
+    if not isinstance(inquiry, dict):
+        print(unresolved)
+        return
+    respondent_id, other_id, episode_id = (inquiry.get(k) for k in ("respondent", "other", "episode_id"))
+    if not all(valid_text(v) for v in (respondent_id, other_id, episode_id)) or respondent_id == other_id:
+        print(unresolved)
+        return
     npc = state.get("npc", {})
     entities = npc.get("entities", {}) if isinstance(npc, dict) else {}
-    heidi = entities.get("heidi", {}) if isinstance(entities, dict) else {}
-    room = heidi.get("current_room") if isinstance(heidi, dict) else None
+    episodes = npc.get("episodes", {}) if isinstance(npc, dict) else {}
+    if not isinstance(entities, dict) or not isinstance(episodes, dict):
+        print(unresolved)
+        return
+    respondent, other, episode = entities.get(respondent_id), entities.get(other_id), episodes.get(episode_id)
+    if not all(isinstance(v, dict) for v in (respondent, other, episode)):
+        print(unresolved)
+        return
+    participants = episode.get("participants")
+    if (
+        not isinstance(participants, list) or len(participants) != 2
+        or not all(valid_text(p) for p in participants)
+        or set(participants) != {respondent_id, other_id}
+    ):
+        print(unresolved)
+        return
+    respondent_name, other_name, episode_name = (v.get("display_name") for v in (respondent, other, episode))
+    if not all(valid_text(v) for v in (respondent_name, other_name, episode_name)):
+        print(unresolved)
+        return
+    room = respondent.get("current_room")
     player_locations = {
         slot_value("whereabouts:player", f["text"])
         for f in state["facts"]
         if f.get("status", "active") == "active"
         and fact_slot(f["text"], f.get("type", "state")) == "whereabouts:player"
     }
-    if (
-        not isinstance(room, str) or not room.strip() or room.lower().strip() in ("none", "unknown")
-        or player_locations != {f"in the {room}"}
-    ):
-        print("Heidi is not available here to answer.")
+    if not valid_text(room) or player_locations != {f"in the {room}"}:
+        print(f"{respondent_name} is not available here to answer.")
         return
-    episodes = npc.get("episodes", {})
-    episode = episodes.get("fixture_morning", {}) if isinstance(episodes, dict) else {}
-    if not isinstance(episode, dict) or episode.get("participants") != ["heidi", "chris"]:
-        print(render_npc_inquiry(None))
-        return
-    result = resolve_npc_episode(state, "fixture_morning", rng=rng)
+    result = resolve_npc_episode(state, episode_id, rng=rng)
     outcome = None
     if result["committed"] or result["reused"]:
-        outcome = state["npc"]["resolutions"]["fixture_morning"]["outcome"]
-    print(render_npc_inquiry(outcome))
+        outcome = state["npc"]["resolutions"][episode_id]["outcome"]
+    print(render_npc_inquiry(outcome, respondent_name, other_name, episode_name))
 
 
 def handle_observation_command(
@@ -344,8 +368,9 @@ try:
             print("[NPC fixture reset]")
             continue
 
-        if user_input.lower().strip() == "ask heidi about chris":
-            handle_npc_inquiry(state)
+        inquiry = NPC_INQUIRIES.get(user_input.lower().strip())
+        if inquiry is not None:
+            handle_npc_inquiry(state, inquiry)
             continue
 
         if user_input == "/npcresolve" or user_input.startswith("/npcresolve "):
