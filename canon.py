@@ -1,4 +1,5 @@
 import json
+import math
 from copy import deepcopy
 import re
 import os
@@ -70,6 +71,28 @@ def reset_npc_test_fixture(state):
     pending["npc"] = build_npc_fixture()
     _save_npc_commit(pending)
     state.update(pending)
+
+
+def set_npc_irritability(state, entity_id, value):
+    """Persist one explicit state assignment without asserting an event or cause."""
+    npc = state.get("npc")
+    validate_npc_state(npc)
+    if not isinstance(entity_id, str) or entity_id not in npc["entities"]:
+        raise ValueError("Unknown NPC ID")
+    entity = npc["entities"][entity_id]
+    previous = entity.get("irritability") if isinstance(entity, dict) else None
+    for label, number in (("Existing irritability", previous), ("New irritability", value)):
+        if type(number) not in (int, float) or not 0 <= number <= 1 or not math.isfinite(number):
+            raise ValueError(f"{label} must be a finite number in [0, 1]")
+    result = {"entity_id": entity_id, "attribute": "irritability",
+              "previous": previous, "value": value, "changed": previous != value}
+    if not result["changed"]:
+        return result
+    pending = deepcopy(state)
+    pending["npc"]["entities"][entity_id]["irritability"] = value
+    _save_npc_commit(pending)
+    state.update(pending)
+    return result
 
 
 def commit_npc_resolution(state, proposal):

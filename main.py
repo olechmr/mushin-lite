@@ -1,4 +1,4 @@
-from canon import reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
+from canon import set_npc_irritability, reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
 import llm_adapter
 from llm_adapter import chat, EXTRACTION_MODE
 from packet_interpreter import facts_from_packet, normalize_packet
@@ -14,6 +14,7 @@ from collapse import (
 import textwrap
 import json
 import rules
+from behavior import evaluate_episode
 from renderer import (
     render_npc_inquiry,
     render_response,
@@ -124,6 +125,8 @@ HELP_SECTIONS = {
         ("/setup", "paste session setup"),
         ("/testreset", "reset canon and map to test fixture"),
         ("/npctestreset", "reset the isolated NPC fixture"),
+        ("/npcset <entity_id> irritability <value>", "set NPC irritability (developer)"),
+        ("/npcevaluate <episode_id>", "evaluate NPC possibilities without collapse"),
         ("/npcresolve <episode_id>", "resolve an installed NPC episode (developer)"),
     ],
 
@@ -379,6 +382,27 @@ try:
                 print("Usage: /npcresolve <episode_id>")
             else:
                 handle_npc_resolve(state, parts[1])
+            continue
+
+        if user_input == "/npcset" or user_input.startswith("/npcset "):
+            parts = user_input.split()
+            if len(parts) != 4 or parts[2] != "irritability":
+                print("Usage: /npcset <entity_id> irritability <value>")
+            else:
+                try:
+                    result = set_npc_irritability(state, parts[1], float(parts[3]))
+                    print(json.dumps(result, indent=2, sort_keys=True))
+                except (ValueError, OSError) as error:
+                    print(f"[npcset error] {error}")
+            continue
+
+        if user_input == "/npcevaluate" or user_input.startswith("/npcevaluate "):
+            parts = user_input.split()
+            if len(parts) != 2:
+                print("Usage: /npcevaluate <episode_id>")
+            else:
+                result = evaluate_episode(state.get("npc"), parts[1])
+                print(json.dumps({"episode_id": parts[1], **result}, indent=2, sort_keys=True))
             continue
 
         if user_input == "/setup":
