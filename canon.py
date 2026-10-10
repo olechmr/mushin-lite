@@ -97,15 +97,14 @@ def set_npc_irritability(state, entity_id, value):
 
 def commit_npc_transition(state, proposal):
     """Validate a fixed-policy proposal, then use the state-only atomic setter."""
-    from behavior import evaluate_transition
-    from npc_fixture import NPC_TRANSITION_POLICY
+    from behavior import evaluate_transition, get_transition_policy
 
     fields = {"status", "policy_id", "reasons", "entity_id", "episode_id",
               "attribute", "previous", "value", "basis"}
     if (
         not isinstance(proposal, dict) or set(proposal) != fields
         or proposal["status"] != "proposed"
-        or proposal["policy_id"] != NPC_TRANSITION_POLICY["policy_id"]
+        or get_transition_policy(proposal["policy_id"]) is None
         or any(type(proposal[k]) not in (int, float) for k in ("previous", "value"))
     ):
         raise ValueError("Invalid NPC transition proposal")

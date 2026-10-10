@@ -14,7 +14,7 @@ from collapse import (
 import textwrap
 import json
 import rules
-from behavior import evaluate_episode, evaluate_transition
+from behavior import evaluate_episode, evaluate_transition, validated_transition_policies
 from renderer import (
     render_npc_inquiry,
     render_response,
@@ -27,7 +27,7 @@ from renderer import (
     render_presentation_sentences,
 )
 from test_fixture import TEST_FACTS
-from npc_fixture import NPC_INQUIRIES, NPC_TRANSITION_POLICY
+from npc_fixture import NPC_INQUIRIES
 
 load_map()
 
@@ -126,7 +126,8 @@ HELP_SECTIONS = {
         ("/setup", "paste session setup"),
         ("/testreset", "reset canon and map to test fixture"),
         ("/npctestreset", "reset the isolated NPC fixture"),
-        ("/npctransitionpreview heidi_morning_irritability_v1", "preview the fixed NPC transition"),
+        ("/npctransitionpreview heidi_morning_irritability_v1", "preview Heidi transition"),
+        ("/npctransitionpreview chris_morning_irritability_v1", "preview Chris transition"),
         ("/npctransitioncommit", "commit the pending NPC transition"),
         ("/npcset <entity_id> irritability <value>", "set NPC irritability (developer)"),
         ("/npcevaluate <episode_id>", "evaluate NPC possibilities without collapse"),
@@ -148,6 +149,31 @@ def show_help():
 
         print()
 
+def process_npc_transitions_for_episode(state, episode_id):
+    """Process explicit dependencies sequentially; episode truth survives failure."""
+    try:
+        policies = [policy for policy in validated_transition_policies()
+                    if policy["episode_id"] == episode_id]
+    except Exception as error:
+        return [{"status": "error", "committed": False, "stage": "registry",
+                 "error": str(error), "error_type": type(error).__name__}]
+    diagnostics = []
+    for policy in policies:
+        transition = {"policy_id": policy["policy_id"], "status": "error", "committed": False}
+        diagnostics.append(transition)
+        stage = "evaluation"
+        try:
+            proposal = evaluate_transition(state["npc"], policy["policy_id"])
+            transition.update(status=proposal["status"], reasons=proposal["reasons"])
+            if proposal["status"] == "proposed":
+                stage = "commitment"
+                result = commit_npc_transition(state, proposal)
+                transition["committed"] = result["changed"]
+        except Exception as error:
+            transition.update(stage=stage, error=str(error), error_type=type(error).__name__)
+    return diagnostics
+
+
 def resolve_npc_episode(state, episode_id, rng=None):
     """Shared collapse/commit path; proposals alone are never disclosed as truth."""
     proposal = collapse_npc_episode(state.get("npc"), episode_id, rng=rng)
@@ -159,20 +185,8 @@ def resolve_npc_episode(state, episode_id, rng=None):
             diagnostic.update(committed=result["committed"], reused=result["reused"])
         except (ValueError, OSError) as error:
             diagnostic["error"] = str(error)
-    if diagnostic["committed"] and NPC_TRANSITION_POLICY["episode_id"] == episode_id:
-        transition = {"policy_id": NPC_TRANSITION_POLICY["policy_id"],
-                      "status": "error", "committed": False}
-        diagnostic["transition"] = transition
-        try:
-            transition_proposal = evaluate_transition(state["npc"], transition["policy_id"])
-            transition.update(status=transition_proposal["status"],
-                              reasons=transition_proposal["reasons"])
-            if transition_proposal["status"] == "proposed":
-                result = commit_npc_transition(state, transition_proposal)
-                transition["committed"] = result["changed"]
-        except Exception as error:
-            # Transition failure must not suppress already-committed episode truth.
-            transition.update(error=str(error), error_type=type(error).__name__)
+    if diagnostic["committed"]:
+        diagnostic["transitions"] = process_npc_transitions_for_episode(state, episode_id)
     return diagnostic
 
 
@@ -233,8 +247,8 @@ def handle_npc_inquiry(state, inquiry, rng=None):
     if result["committed"] or result["reused"]:
         outcome = state["npc"]["resolutions"][episode_id]["outcome"]
     print(render_npc_inquiry(outcome, respondent_name, other_name, episode_name))
-    if "transition" in result:
-        print(f"[NPC transition: {json.dumps(result['transition'], sort_keys=True)}]")
+    for transition in result.get("transitions", []):
+        print(f"[NPC transition: {json.dumps(transition, sort_keys=True)}]")
 
 
 def handle_observation_command(
@@ -407,7 +421,7 @@ try:
             pending_npc_transition = None
             parts = user_input.split()
             if len(parts) != 2:
-                print("Usage: /npctransitionpreview heidi_morning_irritability_v1")
+                print("Usage: /npctransitionpreview <policy_id> (heidi_morning_irritability_v1 or chris_morning_irritability_v1)")
             else:
                 result = evaluate_transition(state.get("npc"), parts[1])
                 if result["status"] == "proposed":

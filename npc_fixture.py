@@ -17,14 +17,24 @@ NPC_INQUIRIES = {
 
 
 # Simulation authorization only; no causal claim or historical whereabouts.
-NPC_TRANSITION_POLICY = {
-    "policy_id": "heidi_morning_irritability_v1",
-    "entity_id": "heidi",
-    "episode_id": "fixture_morning",
-    "required_outcome": "disagreement",
-    "attribute": "irritability",
-    "value": 0.50,
-}
+NPC_TRANSITION_POLICIES = (
+    {
+        "policy_id": "heidi_morning_irritability_v1",
+        "entity_id": "heidi",
+        "episode_id": "fixture_morning",
+        "required_outcome": "disagreement",
+        "attribute": "irritability",
+        "value": 0.50,
+    },
+    {
+        "policy_id": "chris_morning_irritability_v1",
+        "entity_id": "chris",
+        "episode_id": "fixture_morning",
+        "required_outcome": "disagreement",
+        "attribute": "irritability",
+        "value": 0.50,
+    },
+)
 
 
 def build_npc_fixture():

@@ -2,7 +2,7 @@
 
 import math
 from copy import deepcopy
-from npc_fixture import NPC_TRANSITION_POLICY
+from npc_fixture import NPC_TRANSITION_POLICIES
 
 
 OUTCOMES = ("no_interaction", "conversation", "disagreement")
@@ -113,22 +113,49 @@ def evaluate_episode(npc, episode_id):
     )
 
 
+def validated_transition_policies():
+    """Validate the entire explicit collection before lookup or dispatch."""
+    if not isinstance(NPC_TRANSITION_POLICIES, (tuple, list)):
+        raise ValueError("invalid_policy_collection")
+    policy_ids, targets = set(), set()
+    for policy in NPC_TRANSITION_POLICIES:
+        if (
+            not isinstance(policy, dict)
+            or set(policy) != {"policy_id", "entity_id", "episode_id", "required_outcome", "attribute", "value"}
+            or any(not isinstance(policy[k], str) or not policy[k].strip()
+                   for k in ("policy_id", "entity_id", "episode_id"))
+            or policy["required_outcome"] != "disagreement" or policy["attribute"] != "irritability"
+            or type(policy["value"]) not in (int, float) or not 0 <= policy["value"] <= 1
+            or not math.isfinite(policy["value"])
+        ):
+            raise ValueError("invalid_policy")
+        target = (policy["episode_id"], policy["entity_id"], policy["attribute"])
+        if policy["policy_id"] in policy_ids:
+            raise ValueError("duplicate_policy_id")
+        if target in targets:
+            raise ValueError("duplicate_policy_target")
+        policy_ids.add(policy["policy_id"])
+        targets.add(target)
+    return tuple(NPC_TRANSITION_POLICIES)
+
+
+def get_transition_policy(policy_id):
+    """Return one registered policy, or None; invalid registration fails closed."""
+    policies = validated_transition_policies()
+    if not isinstance(policy_id, str):
+        return None
+    return next((policy for policy in policies if policy["policy_id"] == policy_id), None)
+
+
 def evaluate_transition(npc, policy_id):
     """Pure fixed-policy proposal; committed history is input, not a causal claim."""
     result = {"status": "unresolved", "policy_id": policy_id, "reasons": []}
-    policy = NPC_TRANSITION_POLICY
-    if (
-        not isinstance(policy, dict)
-        or set(policy) != {"policy_id", "entity_id", "episode_id", "required_outcome", "attribute", "value"}
-        or any(not isinstance(policy[k], str) or not policy[k].strip()
-               for k in ("policy_id", "entity_id", "episode_id"))
-        or policy["required_outcome"] != "disagreement" or policy["attribute"] != "irritability"
-        or type(policy["value"]) not in (int, float) or not 0 <= policy["value"] <= 1
-        or not math.isfinite(policy["value"])
-    ):
-        result["reasons"] = ["invalid_policy"]
+    try:
+        policy = get_transition_policy(policy_id)
+    except ValueError as error:
+        result["reasons"] = [str(error)]
         return result
-    if not isinstance(policy_id, str) or policy_id != policy["policy_id"]:
+    if policy is None:
         result["reasons"] = ["unsupported_policy"]
         return result
     evaluation = evaluate_episode(npc, policy["episode_id"])
