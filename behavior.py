@@ -1,6 +1,8 @@
 """Pure NPC possibility evaluation. No sampling, facts, persistence or narration."""
 
 import math
+from copy import deepcopy
+from npc_fixture import NPC_TRANSITION_POLICY
 
 
 OUTCOMES = ("no_interaction", "conversation", "disagreement")
@@ -109,3 +111,42 @@ def evaluate_episode(npc, episode_id):
         },
         "prior_disagreement_bias" if prior_disagreement else "compatible_constraints",
     )
+
+
+def evaluate_transition(npc, policy_id):
+    """Pure fixed-policy proposal; committed history is input, not a causal claim."""
+    result = {"status": "unresolved", "policy_id": policy_id, "reasons": []}
+    policy = NPC_TRANSITION_POLICY
+    if (
+        not isinstance(policy, dict)
+        or set(policy) != {"policy_id", "entity_id", "episode_id", "required_outcome", "attribute", "value"}
+        or any(not isinstance(policy[k], str) or not policy[k].strip()
+               for k in ("policy_id", "entity_id", "episode_id"))
+        or policy["required_outcome"] != "disagreement" or policy["attribute"] != "irritability"
+        or type(policy["value"]) not in (int, float) or not 0 <= policy["value"] <= 1
+        or not math.isfinite(policy["value"])
+    ):
+        result["reasons"] = ["invalid_policy"]
+        return result
+    if not isinstance(policy_id, str) or policy_id != policy["policy_id"]:
+        result["reasons"] = ["unsupported_policy"]
+        return result
+    evaluation = evaluate_episode(npc, policy["episode_id"])
+    if evaluation["feasibility"] != "resolved":
+        result["reasons"] = ["missing_or_invalid_committed_prerequisite"]
+        return result
+    episode = npc["episodes"][policy["episode_id"]]
+    if policy["entity_id"] not in episode["participants"]:
+        result["reasons"] = ["target_not_participant"]
+        return result
+    previous = npc["entities"][policy["entity_id"]]["irritability"]
+    if evaluation["allowed_outcomes"] != [policy["required_outcome"]]:
+        result.update(status="no_change", reasons=["prerequisite_outcome_not_matched"])
+    elif previous >= policy["value"]:
+        result.update(status="no_change", reasons=["target_already_met"])
+    else:
+        result.update(status="proposed", reasons=["policy_authorized"],
+                      entity_id=policy["entity_id"], episode_id=policy["episode_id"],
+                      attribute=policy["attribute"], previous=previous,
+                      value=policy["value"], basis=deepcopy(npc))
+    return result

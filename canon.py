@@ -95,6 +95,30 @@ def set_npc_irritability(state, entity_id, value):
     return result
 
 
+def commit_npc_transition(state, proposal):
+    """Validate a fixed-policy proposal, then use the state-only atomic setter."""
+    from behavior import evaluate_transition
+    from npc_fixture import NPC_TRANSITION_POLICY
+
+    fields = {"status", "policy_id", "reasons", "entity_id", "episode_id",
+              "attribute", "previous", "value", "basis"}
+    if (
+        not isinstance(proposal, dict) or set(proposal) != fields
+        or proposal["status"] != "proposed"
+        or proposal["policy_id"] != NPC_TRANSITION_POLICY["policy_id"]
+        or any(type(proposal[k]) not in (int, float) for k in ("previous", "value"))
+    ):
+        raise ValueError("Invalid NPC transition proposal")
+    npc = state.get("npc")
+    validate_npc_state(npc)
+    if not isinstance(proposal["basis"], dict) or proposal["basis"] != npc:
+        raise ValueError("Stale or missing NPC transition basis")
+    authorized = evaluate_transition(npc, proposal["policy_id"])
+    if authorized["status"] != "proposed" or proposal != authorized:
+        raise ValueError("Unauthorized NPC transition proposal")
+    return set_npc_irritability(state, proposal["entity_id"], proposal["value"])
+
+
 def commit_npc_resolution(state, proposal):
     """Commit one authorized proposal and its event together, keyed by episode ID.
 

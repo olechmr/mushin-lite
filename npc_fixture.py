@@ -16,6 +16,17 @@ NPC_INQUIRIES = {
 }
 
 
+# Simulation authorization only; no causal claim or historical whereabouts.
+NPC_TRANSITION_POLICY = {
+    "policy_id": "heidi_morning_irritability_v1",
+    "entity_id": "heidi",
+    "episode_id": "fixture_morning",
+    "required_outcome": "disagreement",
+    "attribute": "irritability",
+    "value": 0.50,
+}
+
+
 def build_npc_fixture():
     """Return fresh data. Windows are ordered fixture units, not an engine clock.
 

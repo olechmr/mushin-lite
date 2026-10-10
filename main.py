@@ -1,4 +1,4 @@
-from canon import set_npc_irritability, reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
+from canon import commit_npc_transition, set_npc_irritability, reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
 import llm_adapter
 from llm_adapter import chat, EXTRACTION_MODE
 from packet_interpreter import facts_from_packet, normalize_packet
@@ -14,7 +14,7 @@ from collapse import (
 import textwrap
 import json
 import rules
-from behavior import evaluate_episode
+from behavior import evaluate_episode, evaluate_transition
 from renderer import (
     render_npc_inquiry,
     render_response,
@@ -38,6 +38,7 @@ SETTINGS = {
 }
 
 NARRATION_ENABLED = False
+pending_npc_transition = None
 
 def normalize_command(user_input):
     text = user_input.lower().strip()
@@ -125,6 +126,8 @@ HELP_SECTIONS = {
         ("/setup", "paste session setup"),
         ("/testreset", "reset canon and map to test fixture"),
         ("/npctestreset", "reset the isolated NPC fixture"),
+        ("/npctransitionpreview heidi_morning_irritability_v1", "preview the fixed NPC transition"),
+        ("/npctransitioncommit", "commit the pending NPC transition"),
         ("/npcset <entity_id> irritability <value>", "set NPC irritability (developer)"),
         ("/npcevaluate <episode_id>", "evaluate NPC possibilities without collapse"),
         ("/npcresolve <episode_id>", "resolve an installed NPC episode (developer)"),
@@ -382,6 +385,35 @@ try:
                 print("Usage: /npcresolve <episode_id>")
             else:
                 handle_npc_resolve(state, parts[1])
+            continue
+
+        if user_input == "/npctransitionpreview" or user_input.startswith("/npctransitionpreview "):
+            pending_npc_transition = None
+            parts = user_input.split()
+            if len(parts) != 2:
+                print("Usage: /npctransitionpreview heidi_morning_irritability_v1")
+            else:
+                result = evaluate_transition(state.get("npc"), parts[1])
+                if result["status"] == "proposed":
+                    pending_npc_transition = result
+                print(json.dumps({k: v for k, v in result.items() if k != "basis"}, indent=2, sort_keys=True))
+            continue
+
+        if user_input == "/npctransitioncommit" or user_input.startswith("/npctransitioncommit "):
+            if user_input != "/npctransitioncommit":
+                print("Usage: /npctransitioncommit")
+            elif pending_npc_transition is None:
+                print("[NPC transition: no pending proposal]")
+            else:
+                try:
+                    result = commit_npc_transition(state, pending_npc_transition)
+                    pending_npc_transition = None
+                    print(json.dumps(result, indent=2, sort_keys=True))
+                except ValueError as error:
+                    pending_npc_transition = None
+                    print(f"[NPC transition rejected] {error}")
+                except OSError as error:
+                    print(f"[NPC transition save failed] {error}")
             continue
 
         if user_input == "/npcset" or user_input.startswith("/npcset "):
