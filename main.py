@@ -27,7 +27,7 @@ from renderer import (
     render_presentation_sentences,
 )
 from test_fixture import TEST_FACTS
-from npc_fixture import NPC_INQUIRIES
+from npc_fixture import NPC_INQUIRIES, NPC_TRANSITION_POLICY
 
 load_map()
 
@@ -159,6 +159,20 @@ def resolve_npc_episode(state, episode_id, rng=None):
             diagnostic.update(committed=result["committed"], reused=result["reused"])
         except (ValueError, OSError) as error:
             diagnostic["error"] = str(error)
+    if diagnostic["committed"] and NPC_TRANSITION_POLICY["episode_id"] == episode_id:
+        transition = {"policy_id": NPC_TRANSITION_POLICY["policy_id"],
+                      "status": "error", "committed": False}
+        diagnostic["transition"] = transition
+        try:
+            transition_proposal = evaluate_transition(state["npc"], transition["policy_id"])
+            transition.update(status=transition_proposal["status"],
+                              reasons=transition_proposal["reasons"])
+            if transition_proposal["status"] == "proposed":
+                result = commit_npc_transition(state, transition_proposal)
+                transition["committed"] = result["changed"]
+        except Exception as error:
+            # Transition failure must not suppress already-committed episode truth.
+            transition.update(error=str(error), error_type=type(error).__name__)
     return diagnostic
 
 
@@ -219,6 +233,8 @@ def handle_npc_inquiry(state, inquiry, rng=None):
     if result["committed"] or result["reused"]:
         outcome = state["npc"]["resolutions"][episode_id]["outcome"]
     print(render_npc_inquiry(outcome, respondent_name, other_name, episode_name))
+    if "transition" in result:
+        print(f"[NPC transition: {json.dumps(result['transition'], sort_keys=True)}]")
 
 
 def handle_observation_command(
