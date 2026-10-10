@@ -4,6 +4,7 @@ from copy import deepcopy
 import re
 import os
 import tempfile
+from npc_fixture import SUPPORTED_DISPOSITIONS
 
 STATE_FILE = "state.json"
 
@@ -73,26 +74,33 @@ def reset_npc_test_fixture(state):
     state.update(pending)
 
 
-def set_npc_irritability(state, entity_id, value):
+def set_npc_disposition(state, entity_id, attribute, value):
     """Persist one explicit state assignment without asserting an event or cause."""
     npc = state.get("npc")
     validate_npc_state(npc)
     if not isinstance(entity_id, str) or entity_id not in npc["entities"]:
         raise ValueError("Unknown NPC ID")
+    if attribute not in SUPPORTED_DISPOSITIONS:
+        raise ValueError("Unsupported NPC disposition")
     entity = npc["entities"][entity_id]
-    previous = entity.get("irritability") if isinstance(entity, dict) else None
-    for label, number in (("Existing irritability", previous), ("New irritability", value)):
+    previous = entity.get(attribute) if isinstance(entity, dict) else None
+    for label, number in ((f"Existing {attribute}", previous), (f"New {attribute}", value)):
         if type(number) not in (int, float) or not 0 <= number <= 1 or not math.isfinite(number):
             raise ValueError(f"{label} must be a finite number in [0, 1]")
-    result = {"entity_id": entity_id, "attribute": "irritability",
+    result = {"entity_id": entity_id, "attribute": attribute,
               "previous": previous, "value": value, "changed": previous != value}
     if not result["changed"]:
         return result
     pending = deepcopy(state)
-    pending["npc"]["entities"][entity_id]["irritability"] = value
+    pending["npc"]["entities"][entity_id][attribute] = value
     _save_npc_commit(pending)
     state.update(pending)
     return result
+
+
+def set_npc_irritability(state, entity_id, value):
+    """Compatibility entry point for the original disposition setter."""
+    return set_npc_disposition(state, entity_id, "irritability", value)
 
 
 def commit_npc_transition(state, proposal):
@@ -115,7 +123,7 @@ def commit_npc_transition(state, proposal):
     authorized = evaluate_transition(npc, proposal["policy_id"])
     if authorized["status"] != "proposed" or proposal != authorized:
         raise ValueError("Unauthorized NPC transition proposal")
-    return set_npc_irritability(state, proposal["entity_id"], proposal["value"])
+    return set_npc_disposition(state, proposal["entity_id"], proposal["attribute"], proposal["value"])
 
 
 def commit_npc_resolution(state, proposal):

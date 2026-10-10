@@ -2,7 +2,7 @@
 
 import math
 from copy import deepcopy
-from npc_fixture import NPC_TRANSITION_POLICIES
+from npc_fixture import NPC_TRANSITION_POLICIES, SUPPORTED_DISPOSITIONS
 
 
 OUTCOMES = ("no_interaction", "conversation", "disagreement")
@@ -69,13 +69,14 @@ def evaluate_episode(npc, episode_id):
     if constraints is None:
         return unresolved("missing_or_invalid_episode_constraints")
     participants, window, overlap = constraints
-    irritability = []
+    dispositions = {attribute: [] for attribute in SUPPORTED_DISPOSITIONS}
     for participant in participants:
         entity = entities[participant]
-        value = entity.get("irritability") if isinstance(entity, dict) else None
-        if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1:
-            return unresolved("missing_or_invalid_disposition")
-        irritability.append(value)
+        for attribute in SUPPORTED_DISPOSITIONS:
+            value = entity.get(attribute) if isinstance(entity, dict) else None
+            if type(value) not in (int, float) or not 0 <= value <= 1 or not math.isfinite(value):
+                return unresolved("missing_or_invalid_disposition")
+            dispositions[attribute].append(value)
 
     prior_disagreement = False
     for resolved_id, resolution in resolutions.items():
@@ -106,8 +107,8 @@ def evaluate_episode(npc, episode_id):
         "possible",
         {
             "no_interaction": 1.0,
-            "conversation": 3.0,
-            "disagreement": 1.0 + sum(irritability) + int(prior_disagreement),
+            "conversation": 2.5 + sum(dispositions["sociability"]),
+            "disagreement": 1.0 + sum(dispositions["irritability"]) + int(prior_disagreement),
         },
         "prior_disagreement_bias" if prior_disagreement else "compatible_constraints",
     )
@@ -124,7 +125,7 @@ def validated_transition_policies():
             or set(policy) != {"policy_id", "entity_id", "episode_id", "required_outcome", "attribute", "value"}
             or any(not isinstance(policy[k], str) or not policy[k].strip()
                    for k in ("policy_id", "entity_id", "episode_id"))
-            or policy["required_outcome"] != "disagreement" or policy["attribute"] != "irritability"
+            or policy["required_outcome"] != "disagreement" or policy["attribute"] not in SUPPORTED_DISPOSITIONS
             or type(policy["value"]) not in (int, float) or not 0 <= policy["value"] <= 1
             or not math.isfinite(policy["value"])
         ):
@@ -166,7 +167,7 @@ def evaluate_transition(npc, policy_id):
     if policy["entity_id"] not in episode["participants"]:
         result["reasons"] = ["target_not_participant"]
         return result
-    previous = npc["entities"][policy["entity_id"]]["irritability"]
+    previous = npc["entities"][policy["entity_id"]][policy["attribute"]]
     if evaluation["allowed_outcomes"] != [policy["required_outcome"]]:
         result.update(status="no_change", reasons=["prerequisite_outcome_not_matched"])
     elif previous >= policy["value"]:

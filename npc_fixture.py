@@ -16,6 +16,9 @@ NPC_INQUIRIES = {
 }
 
 
+SUPPORTED_DISPOSITIONS = ("irritability", "sociability")
+
+
 # Simulation authorization only; no causal claim or historical whereabouts.
 NPC_TRANSITION_POLICIES = (
     {
@@ -34,6 +37,14 @@ NPC_TRANSITION_POLICIES = (
         "attribute": "irritability",
         "value": 0.50,
     },
+    {
+        "policy_id": "heidi_morning_sociability_v1",
+        "entity_id": "heidi",
+        "episode_id": "fixture_morning",
+        "required_outcome": "disagreement",
+        "attribute": "sociability",
+        "value": 0.50,
+    },
 )
 
 
@@ -50,8 +61,8 @@ def build_npc_fixture():
     return {
         "version": 1,
         "entities": {
-            "heidi": {"display_name": "Heidi", "irritability": 0.25, "current_room": "foyer"},
-            "chris": {"display_name": "Chris", "irritability": 0.25, "current_room": "foyer"},
+            "heidi": {"display_name": "Heidi", "irritability": 0.25, "sociability": 0.25, "current_room": "foyer"},
+            "chris": {"display_name": "Chris", "irritability": 0.25, "sociability": 0.25, "current_room": "foyer"},
         },
         "episodes": {
             "fixture_morning": {

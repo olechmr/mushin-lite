@@ -1,4 +1,4 @@
-from canon import commit_npc_transition, set_npc_irritability, reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
+from canon import commit_npc_transition, set_npc_disposition, reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
 import llm_adapter
 from llm_adapter import chat, EXTRACTION_MODE
 from packet_interpreter import facts_from_packet, normalize_packet
@@ -27,7 +27,7 @@ from renderer import (
     render_presentation_sentences,
 )
 from test_fixture import TEST_FACTS
-from npc_fixture import NPC_INQUIRIES
+from npc_fixture import NPC_INQUIRIES, SUPPORTED_DISPOSITIONS
 
 load_map()
 
@@ -128,8 +128,10 @@ HELP_SECTIONS = {
         ("/npctestreset", "reset the isolated NPC fixture"),
         ("/npctransitionpreview heidi_morning_irritability_v1", "preview Heidi transition"),
         ("/npctransitionpreview chris_morning_irritability_v1", "preview Chris transition"),
+        ("/npctransitionpreview heidi_morning_sociability_v1", "preview Heidi sociability transition"),
         ("/npctransitioncommit", "commit the pending NPC transition"),
         ("/npcset <entity_id> irritability <value>", "set NPC irritability (developer)"),
+        ("/npcset <entity_id> sociability <value>", "set NPC sociability (developer)"),
         ("/npcevaluate <episode_id>", "evaluate NPC possibilities without collapse"),
         ("/npcresolve <episode_id>", "resolve an installed NPC episode (developer)"),
     ],
@@ -421,7 +423,7 @@ try:
             pending_npc_transition = None
             parts = user_input.split()
             if len(parts) != 2:
-                print("Usage: /npctransitionpreview <policy_id> (heidi_morning_irritability_v1 or chris_morning_irritability_v1)")
+                print("Usage: /npctransitionpreview <policy_id> (heidi_morning_irritability_v1, chris_morning_irritability_v1, or heidi_morning_sociability_v1)")
             else:
                 result = evaluate_transition(state.get("npc"), parts[1])
                 if result["status"] == "proposed":
@@ -448,11 +450,11 @@ try:
 
         if user_input == "/npcset" or user_input.startswith("/npcset "):
             parts = user_input.split()
-            if len(parts) != 4 or parts[2] != "irritability":
-                print("Usage: /npcset <entity_id> irritability <value>")
+            if len(parts) != 4 or parts[2] not in SUPPORTED_DISPOSITIONS:
+                print("Usage: /npcset <entity_id> <irritability|sociability> <value>")
             else:
                 try:
-                    result = set_npc_irritability(state, parts[1], float(parts[3]))
+                    result = set_npc_disposition(state, parts[1], parts[2], float(parts[3]))
                     print(json.dumps(result, indent=2, sort_keys=True))
                 except (ValueError, OSError) as error:
                     print(f"[npcset error] {error}")
