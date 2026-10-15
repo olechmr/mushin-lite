@@ -16,6 +16,10 @@ NPC_INQUIRIES = {
 }
 
 
+# Only this episode authorizes a single disagreement initiator.
+DISAGREEMENT_INITIATOR_EPISODE = "fixture_morning"
+
+
 SUPPORTED_DISPOSITIONS = ("irritability", "sociability")
 
 

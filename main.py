@@ -1,4 +1,4 @@
-from canon import commit_npc_transition, set_npc_disposition, reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
+from canon import commit_disagreement_initiator, commit_npc_transition, set_npc_disposition, reset_npc_test_fixture, commit_npc_resolution, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
 import llm_adapter
 from llm_adapter import chat, EXTRACTION_MODE
 from packet_interpreter import facts_from_packet, normalize_packet
@@ -9,6 +9,7 @@ from map_data import load_map, reset_map
 from collapse import (
     collapse_observation,
     collapse_npc_episode,
+    collapse_disagreement_initiator,
     preview_observation,
 )
 import textwrap
@@ -195,6 +196,23 @@ def resolve_npc_episode(state, episode_id, rng=None):
 def handle_npc_resolve(state, episode_id, rng=None):
     """Developer diagnostics only; never installs a fixture or invokes the model."""
     diagnostic = resolve_npc_episode(state, episode_id, rng=rng)
+    print(json.dumps(diagnostic, indent=2, sort_keys=True))
+    return diagnostic
+
+
+def handle_npc_refine(state, rng=None):
+    """Developer-only request; diagnostics disclose only committed actor truth."""
+    proposal = collapse_disagreement_initiator(state.get("npc"), "fixture_morning", rng=rng)
+    diagnostic = {k: v for k, v in proposal.items() if k not in ("basis", "disagreement_initiator")}
+    diagnostic["committed"] = False
+    if proposal["status"] == "proposed":
+        try:
+            result = commit_disagreement_initiator(state, proposal)
+            diagnostic.update(result, status="resolved")
+        except (ValueError, OSError) as error:
+            diagnostic.update(status="unresolved", error=str(error), error_type=type(error).__name__)
+    elif proposal["reused"]:
+        diagnostic["disagreement_initiator"] = proposal["disagreement_initiator"]
     print(json.dumps(diagnostic, indent=2, sort_keys=True))
     return diagnostic
 
@@ -409,6 +427,13 @@ try:
         inquiry = NPC_INQUIRIES.get(user_input.lower().strip())
         if inquiry is not None:
             handle_npc_inquiry(state, inquiry)
+            continue
+
+        if user_input == "/npcrefine" or user_input.startswith("/npcrefine "):
+            if user_input != "/npcrefine fixture_morning":
+                print("Usage: /npcrefine fixture_morning")
+            else:
+                handle_npc_refine(state)
             continue
 
         if user_input == "/npcresolve" or user_input.startswith("/npcresolve "):

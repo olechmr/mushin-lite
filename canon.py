@@ -178,6 +178,43 @@ def commit_npc_resolution(state, proposal):
     return {"committed": True, "reused": False, "resolution": deepcopy(resolution)}
 
 
+def commit_disagreement_initiator(state, proposal):
+    """Commit only an authorized actor ID; preserve episode truth and its event."""
+    from behavior import evaluate_disagreement_initiator
+
+    fields = {"episode_id", "status", "disagreement_initiator", "sampled", "reused", "reasons", "basis"}
+    if (
+        not isinstance(proposal, dict) or set(proposal) != fields
+        or proposal["status"] != "proposed" or proposal["sampled"] is not True
+        or proposal["reused"] is not False or not isinstance(proposal["reasons"], list)
+        or not isinstance(proposal["episode_id"], str)
+        or not isinstance(proposal["disagreement_initiator"], str)
+        or not isinstance(proposal["basis"], dict)
+    ):
+        raise ValueError("Invalid disagreement initiator proposal")
+    npc = state.get("npc")
+    validate_npc_state(npc)
+    episode_id, actor = proposal["episode_id"], proposal["disagreement_initiator"]
+    evaluation = evaluate_disagreement_initiator(npc, episode_id)
+    if evaluation["status"] == "resolved":
+        if evaluation["allowed_outcomes"] != [actor]:
+            raise ValueError("Conflicting disagreement initiator")
+        return {"committed": False, "reused": True, "disagreement_initiator": actor}
+    if proposal["basis"] != npc:
+        raise ValueError("Stale or missing disagreement initiator basis")
+    if (
+        evaluation["status"] != "possible" or actor not in evaluation["allowed_outcomes"]
+        or evaluation["weights"].get(actor, 0) <= 0
+        or proposal["reasons"] != evaluation["reasons"]
+    ):
+        raise ValueError("Unauthorized disagreement initiator")
+    pending = deepcopy(state)
+    pending["npc"]["resolutions"][episode_id]["disagreement_initiator"] = actor
+    _save_npc_commit(pending)
+    state.update(pending)
+    return {"committed": True, "reused": False, "disagreement_initiator": actor}
+
+
 def _save_npc_commit(state):
     """One atomic snapshot containing both structured history and its event."""
     path = os.path.abspath(STATE_FILE)

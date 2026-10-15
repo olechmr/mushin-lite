@@ -3,7 +3,7 @@ import random
 import math
 from copy import deepcopy
 from types import SimpleNamespace
-from behavior import OUTCOMES, evaluate_episode
+from behavior import OUTCOMES, evaluate_episode, evaluate_disagreement_initiator
 from canon import fact_slot, normalize_fact
 
 _collapse_rng = random.Random()
@@ -428,4 +428,40 @@ def collapse_npc_episode(npc, episode_id, rng=None):
     selected = select_candidate(candidates, episode_id, {"id": episode_id},
                                 verb="npc_interaction", rng=SimpleNamespace(random=lambda: roll))
     result.update(outcome=selected["id"], basis=deepcopy(npc))
+    return result
+
+
+def collapse_disagreement_initiator(npc, episode_id, rng=None):
+    """Propose one actor role; never resolve or rewrite the shared episode."""
+    result = {"episode_id": episode_id, "status": "unresolved",
+              "disagreement_initiator": None, "sampled": False, "reused": False,
+              "reasons": []}
+    evaluation = evaluate_disagreement_initiator(npc, episode_id)
+    result.update(status=evaluation["status"], reasons=evaluation["reasons"][:])
+    if evaluation["status"] == "resolved":
+        result.update(disagreement_initiator=evaluation["allowed_outcomes"][0], reused=True)
+        return result
+    if evaluation["status"] != "possible":
+        return result
+    allowed, weights = evaluation["allowed_outcomes"], evaluation["weights"]
+    participants = npc["episodes"][episode_id]["participants"]
+    if (
+        not isinstance(allowed, list) or len(allowed) != 2
+        or any(not isinstance(actor, str) for actor in allowed)
+        or set(allowed) != set(participants)
+        or not isinstance(weights, dict) or set(weights) != set(allowed)
+        or any(type(w) not in (int, float) or not 0 < w <= 2 for w in weights.values())
+        or any(not math.isfinite(w) for w in weights.values())
+    ):
+        result.update(status="unresolved", reasons=["invalid_distribution"])
+        return result
+    roll = (rng if rng is not None else _npc_rng).random()
+    result["sampled"] = True
+    if type(roll) not in (int, float) or not 0 <= roll < 1:
+        result.update(status="unresolved", reasons=["invalid_random_draw"])
+        return result
+    candidates = [{"id": actor, "weight": weights[actor]} for actor in sorted(allowed)]
+    selected = select_candidate(candidates, episode_id, {"id": episode_id},
+                                verb="npc_initiator", rng=SimpleNamespace(random=lambda: roll))
+    result.update(status="proposed", disagreement_initiator=selected["id"], basis=deepcopy(npc))
     return result
