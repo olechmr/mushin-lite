@@ -61,8 +61,8 @@ def build_npc_fixture():
     return {
         "version": 1,
         "entities": {
-            "heidi": {"display_name": "Heidi", "irritability": 0.25, "sociability": 0.25, "current_room": "foyer"},
-            "chris": {"display_name": "Chris", "irritability": 0.25, "sociability": 0.25, "current_room": "foyer"},
+            "heidi": {"display_name": "Heidi", "irritability": 0.25, "sociability": 0.75, "current_room": "foyer"},
+            "chris": {"display_name": "Chris", "irritability": 0.75, "sociability": 0.25, "current_room": "foyer"},
         },
         "episodes": {
             "fixture_morning": {
