@@ -18,6 +18,8 @@ Missing information is not permission to invent facts.
 
 Probability may determine which authorized outcome becomes established. Once committed, that outcome is canonical and must not be independently rerolled. Reproducibility of sampling is distinct from persistence of the selected result.
 
+Determinism means that explicit inputs, constraints, configuration, and supplied random state determine a transformation’s result. External model output and other nondeterministic inputs must be treated as explicit inputs, not as canonical authority. This does not require identical prose or repeated sampling to produce identical results without the same inputs and random state.
+
 ## 2. Composable Isolation
 
 Mushin is constructed from independent, composable processing stages.
@@ -47,6 +49,8 @@ Every compatible stage boundary is a potential insertion point for future module
 Stages may be inserted, removed, or replaced without rewriting unrelated components.
 
 Compatibility is determined by interface contracts, authority restrictions, and causal requirements—not by the identity of neighboring modules.
+
+Insertion is permitted at any compatible declared boundary, not at arbitrary instructions inside a stage. A transformation that changes previously validated material must preserve that validation’s guarantees or route the changed output through the required validation again. External composition may be implemented in ordinary host code; a dynamic registry or plugin loader is not required.
 
 ### Graceful Degradation
 
@@ -82,7 +86,9 @@ The engine owns authoritative simulation state, constraints, probability resolut
 
 Its output describes simulation results in a structured, presentation-independent format.
 
-The engine-to-consumer contract must distinguish established facts, unresolved information, authorized presentation material, and diagnostic information where applicable. Proposals and unresolved possibilities must not be represented as committed events.
+The engine-to-consumer contract must distinguish established facts, unresolved information, authorized presentation material, and diagnostic information where applicable.
+
+Canonical truth and permission to disclose it are distinct. The output contract must identify the intended audience and provide only material authorized for that audience, including explicitly authorized uncertainty or rule-block outcomes. Debugging privileges must not implicitly become player knowledge. A declared disclosure boundary must apply before material reaches an audience-facing conditioner or renderer; this does not require a general testimony or private-knowledge system. Proposals and unresolved possibilities must not be represented as committed events.
 
 The engine must not require knowledge of the prose conditioner, renderer, user interface, or host application.
 
@@ -93,6 +99,8 @@ The prose conditioner transforms structured simulation output into narrative rep
 It may determine wording, tone, detail, and presentation style within the constraints of established simulation truth.
 
 It does not establish, modify, or contradict canonical state.
+
+Truth alone is not permission to reveal it. Conditioning must preserve the supplied disclosure limits and must not turn latent alternatives or diagnostics into narrative assertions. Integrations must define how unauthorized or invalid conditioned output is rejected or replaced with safe authorized output; prompt instructions alone do not demonstrate that guarantee.
 
 The prose conditioner must not require knowledge of the engine's internal implementation or the renderer receiving its output.
 
@@ -167,6 +175,8 @@ An expansion point is a property of the interface between stages, not a hardcode
 
 Pipeline ordering is a responsibility of the composition mechanism and must preserve all applicable architectural invariants.
 
+Orchestration may invoke declared stage interfaces, route explicit results, and enforce lifecycle and ordering requirements. Knowing which implementations are installed is appropriate for the composer, not for the stages it composes. Orchestration must not acquire canonical write authority merely by coordinating stages, and must not hide substantive transformations or authorization decisions between declared boundaries.
+
 ## 5. Authority and Canon
 
 Canonical state is authoritative.
@@ -181,6 +191,18 @@ Unknown, missing, malformed, or contradictory information must not silently beco
 
 Modules must not bypass commitment validation.
 
+### Commitment Contract
+
+Commitment must independently authorize the requested change against current authoritative state and governing constraints. It must not trust a proposal merely because it came from an approved producer, nor require that producer’s implementation to be installed. Shared pure authorization validators and declared infrastructure are permitted; calling a proposal-producing stage to obtain its approval is not a substitute for an independent commitment contract.
+
+Each commitment operation must declare the state on which its authorization depends and validate freshness at the write boundary. A stale proposal must be rejected or handled by an explicitly defined revalidation protocol; it must not silently become a different selection or assignment. Whole-state snapshots, revisions, or other equivalent mechanisms are implementation choices, not mandated storage formats.
+
+Each operation must define its atomic unit, including any inseparable structured resolution and associated event. Validation or persistence failure must not expose a partially applied unit as committed truth. Caller-visible state and durable state must agree on success; uncertain persistence outcomes must be reported explicitly and reconciled before retry. Concurrency and crash guarantees must be stated rather than inferred from the use of a save function.
+
+Separate commitments remain separate unless an explicit contract combines them. Failure of a later disposition transition or presentation step must not roll back, erase, or reinterpret an already committed episode. Multi-step workflows must expose which units committed and which failed.
+
+Retry and reuse behavior must be explicit. Stable resolution identity must prevent duplicate events and rerolling of committed outcomes; conflicting recommitments must fail closed. Loading or looking up history must not silently retry failed follow-up operations. Automatic retries require a declared policy that preserves freshness, identity, and prior truth; there is no general requirement for durable retry machinery.
+
 ## 6. Subtractive Simulation
 
 Mushin operates by constraining possibility.
@@ -194,6 +216,8 @@ Observation may resolve previously uncommitted possibilities, but cannot contrad
 Unobserved details need not be generated prematurely.
 
 Committed consequences may exist before their detailed narrative explanation, provided sufficient causal constraints are preserved to prevent retroactive contradictions.
+
+Causal correctness constrains dependencies and permissible history; it does not require inventing a narrative cause for every state change. A simulation policy may use committed information to authorize a state transition without asserting that information as its psychological or narrative cause. Later details may resolve only still-open information consistent with canon; a causal explanation requires its own explicit authorization and, when it establishes world truth, commitment.
 
 An offscreen event can resolve and commit consequences without the player's knowledge. Observation can subsequently reveal those consequences or resolve remaining details.
 
@@ -224,6 +248,8 @@ The pipeline must continue using its defined baseline implementation or a compat
 A pass-through is valid only when the omitted transformation is not itself necessary to preserve the baseline responsibility.
 
 Optional module removal must not create contradictory state, bypass validation, or transfer authority to another component implicitly.
+
+Committed history and constraints must survive removal of the module that produced their proposals. Absence must not erase, reroll, or silently reinterpret that history. If remaining components cannot safely interpret persisted extension data, preserve it and explicitly reject affected operations until a compatible reader or authorized migration is available; unaffected baseline operation must remain coherent. Module removal is not a world reset.
 
 ### Resolution and Refinement
 
@@ -301,6 +327,8 @@ Both operating modes must produce compatible downstream output.
 
 NPC activity must not require player observation, player participation, or narrative presentation.
 
+The baseline must have a declared activation path independent of player inquiry and of the optional high-resolution Behavior module. A host request, explicit simulation step, or event-driven activation may supply that path; this contract does not mandate clocks, continuous ticks, background execution, or exact offstage location tracking. Activation requests computation, not an assertion that an event occurred, and must still pass the ordinary resolution and commitment boundaries.
+
 Where supported by the installed simulation capabilities, NPCs may initiate interactions with one another and produce persistent consequences outside the player's immediate awareness.
 
 Objective consequences may become canonical before their detailed narrative explanation is generated.
@@ -343,7 +371,10 @@ Every module contract must define:
 - Required capabilities and dependencies
 - Pipeline insertion requirements
 - Absence and fallback behavior
-- Failure handling
+- Failure handling, effects already committed, and any retry/reuse policy
+- Freshness dependencies and atomicity guarantees for authorized writes
+- Persisted-data ownership and behavior after module removal
+- Audience/disclosure restrictions where output leaves an authority boundary
 - Compatibility and version requirements
 
 Module installation must not silently transfer canonical authority.
