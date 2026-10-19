@@ -335,6 +335,22 @@ Objective consequences may become canonical before their detailed narrative expl
 
 Any later explanation must remain consistent with established history and constraints.
 
+### Lite Host Activation Boundary
+
+`npc_activation.activate_npc_episode(state, episode_id, rng=None)` is external orchestration of one explicitly installed episode. The caller supplies the existing canonical state dictionary (including `facts`, `next_fact_id`, and the NPC namespace), an installed episode ID, and optionally an RNG exposing `random()`. The existing collapse RNG and canon persistence configuration are used otherwise. Importing this module must not load saves, install fixtures, start a CLI, render output, or invoke an LLM.
+
+A request authorizes computation only. Activation must not create episode definitions, select a new episode on its own, or write canonical state directly. Existing evaluation, sampling, and canon authorization/persistence operations retain their responsibilities. Player presence, inquiry, observation, rendering, and LLM availability are not prerequisites.
+
+The returned diagnostic dictionary retains episode ID, feasibility, outcome, sampling/reuse flags, reasons, and `committed`, but excludes the proposal basis. `activation_status` is `committed`, `reused`, or `failed`, describing the episode operation only. A failed commitment can retain a proposed `outcome` for diagnostics; that value is not established truth. Missing/invalid NPC or episode data fails closed through existing validation. Callers must supply the canonical storage envelope; this boundary does not repair corrupt saves. Existing `ValueError`/`OSError` commitment failures are reported in `error`; unexpected dependency exceptions propagate without automatic retry or success substitution.
+
+Only a new successful episode commitment dispatches disposition policies, in registered order and against the latest state after each preceding operation. Ordered `transitions` diagnostics report individual results and errors. A transition failure leaves the episode and earlier successful transitions committed; later independent policies still run. Episode success is not a claim that all follow-ups succeeded. No initiator refinement is implicitly requested.
+
+Repeated activation reuses established episode truth without resampling or replaying transitions, including previously failed transitions. A caller may explicitly retry an uncommitted episode after a known safe failure; it may sample again. Uncertain persistence outcomes require reconciliation before retry. Follow-up recovery remains an explicit separate operation. There is no automatic retry queue.
+
+This boundary supports serialized, single-threaded calls with a current caller-owned state. It adds no concurrent-writer coordination, durable revision check, scheduler, or stronger crash guarantees. Existing canon-to-evaluator coupling remains an implementation gap, not permission to bypass independent authorization.
+
+Host-triggered activation is distinct from autonomous NPC episode selection/initiation, baseline archetype behavior, and optional higher-resolution Behavior refinement. Those three capabilities remain unimplemented in this Lite slice. The target requirements above remain unchanged.
+
 ### World Independence
 
 NPC behavior must not assume romance, friendship, hostility, or any particular genre as its default purpose.
