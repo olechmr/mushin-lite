@@ -122,10 +122,10 @@ def get_local_conditioning(user_input, facts):
     """
     if not LOCAL_CONDITIONING_ENABLED:
         packet = normalize_conditioning_packet({
-            "action": parsed.get("action", "unknown"),
-            "target": parsed.get("target", "none"),
-            "intent": parsed.get("intent", ""),
-            "confidence": parsed.get("confidence", "medium")
+            "action": "unknown",
+            "target": "none",
+            "intent": "local conditioning disabled",
+            "confidence": "low"
         })
 
         return packet
