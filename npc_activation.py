@@ -1,4 +1,4 @@
-"""Serialized host activation of installed episodes, not autonomous NPC behavior.
+"""Serialized host orchestration of episodes and bounded opportunity decisions.
 
 No import-time state loading or presentation. Canon retains all write authority.
 See ARCHITECTURE.md, Lite Host Activation Boundary, for results and retry rules.
@@ -55,3 +55,53 @@ def activate_npc_episode(state, episode_id, rng=None):
     diagnostic["activation_status"] = ("committed" if diagnostic["committed"]
                                        else "reused" if diagnostic["reused"] else "failed")
     return diagnostic
+
+
+def activate_npc_opportunity(state, npc_id, rng=None):
+    """Host-only bounded initiation; reuse never retries an episode activation."""
+    from npc_opportunity_rules import existing_opportunity_decision, validate_opportunity_handoff
+    from canon import commit_npc_opportunity
+
+    result = {"npc_id": npc_id, "decision_status": "failed", "episode_status": "not_requested"}
+    npc = state.get("npc") if isinstance(state, dict) else None
+    try:
+        existing = existing_opportunity_decision(npc, npc_id)
+        if existing is not None:
+            result.update(decision_status="reused", decision=existing)
+            if existing["choice"] == "episode":
+                # Reuse history without invoking provider, RNG, activation or follow-ups.
+                from copy import deepcopy
+                from npc_episode_rules import OUTCOMES
+                result["episode_status"] = "recovery_required"
+                if existing["episode_id"] in npc["resolutions"]:
+                    resolution = npc["resolutions"][existing["episode_id"]]
+                    if not isinstance(resolution, dict) or resolution.get("outcome") not in OUTCOMES:
+                        raise ValueError("invalid_stored_episode_resolution")
+                    result.update(episode_status="activated", episode={"reused": True,
+                                  "committed": False, "resolution": deepcopy(resolution)})
+            return result
+        from npc_opportunity import evaluate_npc_opportunities
+        from npc_opportunity_resolution import resolve_npc_opportunity
+        possibilities = evaluate_npc_opportunities(npc, npc_id)
+        if possibilities["status"] != "possible":
+            result["reasons"] = possibilities["reasons"]
+            return result
+        proposal = resolve_npc_opportunity(npc, npc_id, possibilities, rng)
+        committed = commit_npc_opportunity(state, proposal)
+        record = committed["decision"]
+        result.update(decision_status="committed" if committed["committed"] else "reused",
+                      decision=record)
+        if record["choice"] == "no_initiation":
+            return result
+        if not committed["committed"]:
+            result["episode_status"] = "recovery_required"
+            return result
+        result["episode_status"] = "failed"
+        episode_id = validate_opportunity_handoff(state["npc"], record)
+        episode = activate_npc_episode(state, episode_id, rng)
+        result.update(episode=episode,
+                      episode_status="activated" if episode["committed"] or episode["reused"] else "failed")
+    except Exception as error:
+        # Preserve/report partial success, including unexpected dependency failures.
+        result.update(error=str(error), error_type=type(error).__name__)
+    return result

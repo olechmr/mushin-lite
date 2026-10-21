@@ -30,6 +30,12 @@ NPC_ARCHETYPES = {"interaction_v1": {
 }}
 
 
+# Opportunity selection is separate from episode outcome weighting.
+NPC_INITIATION_POLICY = {"id": "initiation_v1", "version": 1,
+                         "archetype": "interaction_v1", "no_initiation": 1.0,
+                         "initiation_base": 1.0}
+
+
 # Simulation authorization only; no causal claim or historical whereabouts.
 NPC_TRANSITION_POLICIES = (
     {
@@ -96,4 +102,9 @@ def build_npc_fixture():
             },
         },
         "resolutions": {},
+        "opportunities": {
+            "version": 1, "current_window": "fixture_morning_window",
+            "windows": {"fixture_morning_window": [0, 1]},
+            "decisions": {"fixture_morning_window": {}},
+        },
     }

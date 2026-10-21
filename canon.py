@@ -203,6 +203,63 @@ def commit_disagreement_initiator(state, proposal):
     return {"committed": True, "reused": False, "disagreement_initiator": actor}
 
 
+def establish_npc_decision_window(state, window_id, window):
+    """Explicit host lifecycle operation; never called by load or evaluation."""
+    from npc_opportunity_rules import valid_id, valid_window, opportunity_state
+
+    npc = state.get("npc")
+    validate_npc_state(npc)
+    if not valid_id(window_id) or not valid_window(window):
+        raise ValueError("invalid_decision_window")
+    if "opportunities" in npc:
+        data = opportunity_state(npc)
+        current = data["current_window"]
+        if window_id == current and window == data["windows"][current]:
+            return {"changed": False, "window_id": window_id}
+        if window_id in data["windows"] or window[0] < data["windows"][current][1]:
+            raise ValueError("cannot_reopen_or_overlap_decision_window")
+    else:
+        data = {"version": 1, "current_window": window_id, "windows": {}, "decisions": {}}
+    pending = deepcopy(state)
+    extension = deepcopy(data)
+    extension["current_window"] = window_id
+    extension["windows"][window_id] = deepcopy(window)
+    extension["decisions"][window_id] = {}
+    pending["npc"]["opportunities"] = extension
+    opportunity_state(pending["npc"])
+    _save_npc_commit(pending)
+    state.update(pending)
+    return {"changed": True, "window_id": window_id}
+
+
+def commit_npc_opportunity(state, proposal):
+    """Persist a decision/claim only; episode truth requires its own commitment."""
+    from npc_opportunity_rules import (opportunity_state, validate_opportunity_proposal_shape,
+                                       validate_opportunity_decision)
+
+    validate_opportunity_proposal_shape(proposal)
+    npc = state.get("npc")
+    data = opportunity_state(npc)
+    window_id, npc_id = proposal["window_id"], proposal["npc_id"]
+    existing = data["decisions"].get(window_id, {}).get(npc_id)
+    if existing is not None:
+        if existing["choice"] != proposal["choice"] or existing["episode_id"] != proposal["episode_id"]:
+            raise ValueError("conflicting_opportunity_decision")
+        return {"committed": False, "reused": True, "decision": deepcopy(existing)}
+    validate_opportunity_decision(npc, proposal)
+    episode_id = proposal["episode_id"]
+    record = {"version": 1, "npc_id": npc_id, "window_id": window_id,
+              "window": deepcopy(data["windows"][window_id]), "policy": "initiation_v1",
+              "choice": proposal["choice"], "episode_id": episode_id,
+              "episode": deepcopy(npc["episodes"][episode_id]) if episode_id is not None else None}
+    pending = deepcopy(state)
+    pending["npc"]["opportunities"]["decisions"][window_id][npc_id] = record
+    opportunity_state(pending["npc"])
+    _save_npc_commit(pending)
+    state.update(pending)
+    return {"committed": True, "reused": False, "decision": deepcopy(record)}
+
+
 def _save_npc_commit(state):
     """One atomic snapshot containing both structured history and its event."""
     path = os.path.abspath(STATE_FILE)
