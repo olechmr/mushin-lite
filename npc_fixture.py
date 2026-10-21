@@ -23,6 +23,13 @@ DISAGREEMENT_INITIATOR_EPISODE = "fixture_morning"
 SUPPORTED_DISPOSITIONS = ("irritability", "sociability")
 
 
+# Explicit versioned baseline configuration, not installed by loading old saves.
+NPC_ARCHETYPES = {"interaction_v1": {
+    "version": 1, "no_interaction": 1.0, "conversation": 2.5,
+    "disagreement": 1.0, "history_bias": 1.0,
+}}
+
+
 # Simulation authorization only; no causal claim or historical whereabouts.
 NPC_TRANSITION_POLICIES = (
     {
@@ -65,8 +72,8 @@ def build_npc_fixture():
     return {
         "version": 1,
         "entities": {
-            "heidi": {"display_name": "Heidi", "irritability": 0.25, "sociability": 0.75, "current_room": "foyer"},
-            "chris": {"display_name": "Chris", "irritability": 0.75, "sociability": 0.25, "current_room": "foyer"},
+            "heidi": {"archetype": "interaction_v1", "display_name": "Heidi", "irritability": 0.25, "sociability": 0.75, "current_room": "foyer"},
+            "chris": {"archetype": "interaction_v1", "display_name": "Chris", "irritability": 0.75, "sociability": 0.25, "current_room": "foyer"},
         },
         "episodes": {
             "fixture_morning": {

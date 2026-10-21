@@ -132,7 +132,7 @@ def commit_npc_resolution(state, proposal):
     Existing identical resolutions are no-ops. No event-text lookup determines
     identity. Validation and disk failure leave the caller's state unchanged.
     """
-    from behavior import OUTCOMES, evaluate_episode
+    from npc_episode_rules import OUTCOMES, validate_resolution
 
     npc = state.get("npc")
     validate_npc_state(npc)
@@ -144,19 +144,7 @@ def commit_npc_resolution(state, proposal):
         if not isinstance(existing, dict) or existing.get("outcome") != outcome:
             raise ValueError("Conflicting NPC resolution")
         return {"committed": False, "reused": True, "resolution": deepcopy(existing)}
-    if proposal.get("basis") != npc:
-        raise ValueError("Stale or missing NPC proposal basis")
-    evaluation = evaluate_episode(npc, episode_id)
-    feasibility = evaluation["feasibility"]
-    if (
-        proposal.get("feasibility") != feasibility
-        or proposal.get("reused") is not False
-        or feasibility not in ("possible", "impossible")
-        or outcome not in evaluation["allowed_outcomes"]
-        or evaluation["weights"].get(outcome, 0) <= 0
-        or proposal.get("sampled") is not (feasibility == "possible")
-    ):
-        raise ValueError("Unauthorized NPC resolution proposal")
+    validate_resolution(npc, proposal)
     episode = npc["episodes"][episode_id]
     names = [npc["entities"][p].get("display_name") for p in episode["participants"]]
     label = episode.get("display_name")

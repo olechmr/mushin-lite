@@ -3,7 +3,8 @@ import random
 import math
 from copy import deepcopy
 from types import SimpleNamespace
-from behavior import OUTCOMES, evaluate_episode, evaluate_disagreement_initiator
+from behavior import evaluate_disagreement_initiator
+from npc_episode_rules import OUTCOMES
 from canon import fact_slot, normalize_fact
 
 _collapse_rng = random.Random()
@@ -365,8 +366,8 @@ def collapse_observation(
     return results
 
 
-def collapse_npc_episode(npc, episode_id, rng=None):
-    """Propose an outcome without mutation or persistence; existing truth wins."""
+def existing_npc_episode(npc, episode_id):
+    """Return invalid/reused diagnostics, or None when evaluation is needed."""
     result = {
         "episode_id": episode_id, "feasibility": "unresolved", "outcome": None,
         "sampled": False, "reused": False, "reasons": [],
@@ -389,7 +390,34 @@ def collapse_npc_episode(npc, episode_id, rng=None):
                       reasons=["already_resolved"])
         return result
 
-    evaluation = evaluate_episode(npc, episode_id)
+    return None
+
+
+def collapse_npc_episode(npc, episode_id, rng=None):
+    """Legacy composition wrapper; new hosts use npc_activation orchestration."""
+    existing = existing_npc_episode(npc, episode_id)
+    if existing is not None:
+        return existing
+    from npc_baseline import evaluate_baseline_episode
+    return resolve_npc_episode_possibilities(npc, episode_id,
+                                            evaluate_baseline_episode(npc, episode_id), rng)
+
+
+def resolve_npc_episode_possibilities(npc, episode_id, evaluation, rng=None):
+    """Resolve supplied possibilities; never call the possibility provider."""
+    from npc_episode_rules import validate_possibilities
+    result = {"episode_id": episode_id, "feasibility": "unresolved", "outcome": None,
+              "sampled": False, "reused": False, "reasons": []}
+    if isinstance(evaluation, dict) and evaluation.get("feasibility") == "unresolved":
+        reasons = evaluation.get("reasons")
+        result["reasons"] = reasons[:] if isinstance(reasons, list) else ["invalid_evaluation"]
+        return result
+    try:
+        validate_possibilities(npc, episode_id, evaluation)
+    except ValueError as error:
+        result["reasons"] = [str(error)]
+        return result
+    result["possibilities"] = deepcopy(evaluation)
     result.update(feasibility=evaluation["feasibility"], reasons=evaluation["reasons"][:])
     if evaluation["feasibility"] == "unresolved":
         return result

@@ -6,7 +6,7 @@ See ARCHITECTURE.md, Lite Host Activation Boundary, for results and retry rules.
 
 from behavior import evaluate_transition, validated_transition_policies
 from canon import commit_npc_resolution, commit_npc_transition
-from collapse import collapse_npc_episode
+from collapse import existing_npc_episode, resolve_npc_episode_possibilities
 
 
 def process_npc_transitions_for_episode(state, episode_id):
@@ -36,8 +36,13 @@ def process_npc_transitions_for_episode(state, episode_id):
 
 def activate_npc_episode(state, episode_id, rng=None):
     """Shared collapse/commit path; proposals alone are never disclosed as truth."""
-    proposal = collapse_npc_episode(state.get("npc") if isinstance(state, dict) else None, episode_id, rng=rng)
-    diagnostic = {key: value for key, value in proposal.items() if key != "basis"}
+    npc = state.get("npc") if isinstance(state, dict) else None
+    proposal = existing_npc_episode(npc, episode_id)
+    if proposal is None:
+        from npc_baseline import evaluate_baseline_episode
+        evaluation = evaluate_baseline_episode(npc, episode_id)
+        proposal = resolve_npc_episode_possibilities(npc, episode_id, evaluation, rng=rng)
+    diagnostic = {key: value for key, value in proposal.items() if key not in ("basis", "possibilities")}
     diagnostic["committed"] = False
     if proposal["outcome"] is not None and not proposal["reused"]:
         try:
