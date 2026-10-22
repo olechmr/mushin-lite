@@ -29,6 +29,18 @@ This slice builds on `57c1a3f6d37817dae4bec48e365c637637b2e506`. The bounded dec
 
 This slice builds on `b48437e4ca8a33407d7dc33c23cc29bde32e7322`. The §8 bounded processing contract was recorded before production changes. `npc_window.process_npc_decision_window` processes a host-retained roster in stable order within the expected current window. Complete preflight, fresh sequential activation, committed-prefix preservation, and explicit failure reporting add no canonical progress state or window advancement. `test_npc_window.py` covers this boundary. Historical transition completion remains unknown on reuse because diagnostics are not durable; host-only processing does not resolve G-04 disclosure or G-14 recovery/lifecycle gaps.
 
+## Audience disclosure architecture checkpoint
+
+Reviewed against `a64e14caddefe0cb719f47c599f765c059f7ac7c`. The new §3 disclosure contract is **specified only**; no runtime path is changed or certified audience-safe by this checkpoint. Local command interpretation still receives every active fact, presentation retains active canon, NPC inquiries print transition diagnostics, and developer commands share the ordinary CLI. G-03/G-04 therefore remain open.
+
+Integration cannot safely stop at excluding NPC event text. `main.handle_observation_command` drops discovery provenance and commits reveal/marker separately through `canon.add_fact`, which mutates memory before persistence. Persistent acquisitions require a documented atomic observation unit and independently authorized source/reference binding. Ordinary turn-local action results need a bounded typed handoff; arbitrary text cannot grant disclosure. Existing reset paths must atomically clear affected grants and rotate generations so identical recreated IDs/content cannot inherit them. These changes require focused ordinary-gameplay and failure regression coverage in addition to the existing NPC suites.
+
+The next production checkpoint must implement and test records/authorization/reset behavior and the observation/action compatibility contracts, then wire all player model/presentation entry points and separate diagnostics. Until that integration passes its acceptance gate, do not claim offscreen simulation is player-safe. Missing legacy acquisition evidence must not be repaired by classifying active facts as public. General testimony, witnessing, beliefs, sensory simulation, and free-form prose verification remain deferred.
+
+## Design-intent and native-vocabulary clarification
+
+These documentation-only clarifications build on `a64e14caddefe0cb719f47c599f765c059f7ac7c` and preserve the pending disclosure checkpoint. Lite's standalone completeness defines its intended responsibility, not the completion status of this repository. Full remains an experimental optional Behavior expansion; no dependency on Full is introduced for archetypes or subjective interpretation. No production code, tests, identifiers, or storage formats change here.
+
 ## Gap register
 
 | ID | Target contract area | Lite evidence and observed difference | Assessment | Follow-up verification (not an instruction to implement) |
@@ -47,6 +59,9 @@ This slice builds on `b48437e4ca8a33407d7dc33c23cc29bde32e7322`. The §8 bounded
 | G-12 | §10–§12 — versioned contracts and conformance | The NPC storage envelope has version 1 and operation-specific validation; this is not a versioned set of processing-stage contracts. `test_npc_initiator.py` covers the bounded refinement; `test_npc_activation.py` covers host activation, import isolation, ordering, failures, reuse, and CLI compatibility. `test_npc_baseline.py` covers policy binding, pure evaluation, distribution validation, independent episode authorization, and historical reuse. `test_npc_opportunity.py` covers bounded selection, window lifecycle, claims, separate persistence, and no replay. These are not a complete architecture conformance suite. | Not demonstrated | Inventory actual validation and tests separately from schema versions; define approved interfaces before proposing conformance work. |
 | G-13 | §2, §4 — explicit rule results | `rules.py::apply_rules` returns candidates but also sets global `LAST_RULE` and `LAST_RULE_TYPE`. `main.py` uses those globals to capture block text and report results; adapter logging also reads rule state. The turn-local presentation fix avoids event-deduplication dependence, but the rule result still crosses a hidden mutable channel. | Observed deviation | Specify the full rule-result boundary while preserving existing precedence and exact block wording; no cleanup is authorized here. |
 | G-14 | §5, §7, §10 — removal and follow-up lifecycle | `npc_activation.activate_npc_episode` dispatches transitions only after a new successful commitment. Per-policy failures are reported and later independent policies continue; reuse/load does not replay them. This preserves episode truth and permits explicit manual recovery. Removing behavior code is not a supported independent lifecycle: collapse and commitment still import it. A persisted extension-data retention/migration contract is not demonstrated. | Partial conformity / future lifecycle gap | Preserve the no-implicit-retry semantics and committed history; specify unsupported-data handling before optional-module removal is implemented. |
+| G-15 | §1, §3, §8 — Lite subjectivity and packets | Current keyed episode outcomes, fixture disposition transitions, and diagnostic dictionaries do not implement one truth packet and an established observer packet per applicable observer. Subjective interpretation belongs to Lite; the player-only disclosure checkpoint is narrower and remains unimplemented. | Future architecture / implementation gap | Specify observer applicability, packet schemas, perspective authorization/persistence, and partial-failure units without granting observers objective omniscience. |
+| G-16 | §7–§8 — Full, NPC DNA, individual lens | The current fixture configuration is Python data and mutable saves are JSON. Stable YAML DNA, a shared neutral human reference configuration, individual deltas, and emergent individuality from low-order primitives are not implemented. | Experimental future target | Define primitive/configuration contracts and safe baseline changes; preserve archetype operation and committed perspectives/history when Behavior is removed. |
+| G-17 | §6, §9, §11 — subtractive worlds and native vocabulary | Current action/interaction allowlists and fixed house content are bounded implementation choices. Whodunnit, lucid dream, and neighborhood are project plans; generalized cartridge and presentation integrations are not established. Evidence gravity retains its native name without a specified operational contract here. | Partial / future architecture | Specify unforeseen-action authorization, cartridge interfaces, and evidence gravity before implementation; do not infer an algorithm, object hierarchy, or current capability from terminology. |
 
 ## Important distinctions
 
@@ -68,13 +83,14 @@ The goal of this document is architectural visibility. Decisions about sequence,
 2. How will orchestration expose compatible insertion points without exposing stage internals or making pipeline ordering arbitrary where causality forbids it?
 3. Which capabilities are fundamental baseline responsibilities, and which are specialized cartridge/module features that can simply be absent?
 4. How can optional Behavior refine the bounded `interaction_v1` baseline under independent authorization without producing a second resolution path?
-5. What is the minimal distinction among committed events, unresolved possibilities, actor knowledge, disclosure, presentation data, and diagnostics?
+5. Which schemas and commitment boundaries implement the established distinction among objective truth packets, observer/subjective packets, learned information, authorized presentation, and diagnostics?
 6. What state and side effects are allowed for adapters, shared infrastructure, and orchestration code?
 7. What are each operation’s freshness dependencies, atomic units, concurrency/crash guarantees, and explicit retry or reconciliation policies?
 8. Which shared authorization contracts let commitment validate independently of proposal-producing implementations?
 9. How are persisted extension data retained and interpreted when their optional module is absent?
 10. Which audience/knowledge policy filters engine output, and how are invalid conditioned results detected or safely replaced?
 11. How should future scheduling and opportunity generation extend the explicit-window `initiation_v1` boundary without weakening persistent abstention or claims?
+12. What is the operational contract for evidence gravity, preserving its native meaning without guessing a mechanism?
 
 ## Maintenance procedure
 

@@ -20,6 +20,12 @@ Probability may determine which authorized outcome becomes established. Once com
 
 Determinism means that explicit inputs, constraints, configuration, and supplied random state determine a transformation’s result. External model output and other nondeterministic inputs must be treated as explicit inputs, not as canonical authority. This does not require identical prose or repeated sampling to produce identical results without the same inputs and random state.
 
+### Lite and Full
+
+**Mushin Lite is a complete, standalone world simulation engine.** Lite owns canon, possibility constraints, probability resolution, observation collapse, commitment, persistence, and the mechanisms necessary for a functioning world, including baseline NPC archetypes. This defines Lite's architectural responsibility; the current repository implements bounded portions and retains the gaps recorded separately.
+
+**Mushin Full is Lite with the optional Behavior expansion.** Full attempts emergent individuality through interacting low-order primitives, not increasingly elaborate high-order personality statistics. It is experimental: emergent individuality is a research objective, not an established achievement. Removing Behavior returns NPCs to their baseline archetype mechanisms while preserving established world history and perspectives under the lifecycle contract in §7.
+
 ## 2. Composable Isolation
 
 Mushin is constructed from independent, composable processing stages.
@@ -51,6 +57,8 @@ Stages may be inserted, removed, or replaced without rewriting unrelated compone
 Compatibility is determined by interface contracts, authority restrictions, and causal requirements—not by the identity of neighboring modules.
 
 Insertion is permitted at any compatible declared boundary, not at arbitrary instructions inside a stage. A transformation that changes previously validated material must preserve that validation’s guarantees or route the changed output through the required validation again. External composition may be implemented in ordinary host code; a dynamic registry or plugin loader is not required.
+
+Readable procedural stages, independently composed as input → transform → output, remain appropriate. Do not introduce OOP boilerplate, object hierarchies, or abstractions merely to match conventional architecture. Established programming techniques remain available where they serve the contract.
 
 ### Graceful Degradation
 
@@ -92,6 +100,14 @@ Canonical truth and permission to disclose it are distinct. The output contract 
 
 The engine must not require knowledge of the prose conditioner, renderer, user interface, or host application.
 
+### Truth and Observer Packets
+
+The intended event output contract establishes one authoritative **truth packet** for a committed event and one **observer packet** (also called a **subjective packet**) for each applicable observer. Observer packets represent established individual perspectives, not alternative prose versions of the truth packet. Their observer identity and subjective status must remain distinguishable from objective event truth. Establishing that an observer holds a perspective does not establish its interpretation as objective reality; perspective establishment still requires the engine's authorization and commitment path.
+
+Audience authorization controls which packets and information an external consumer may receive. No actor inside the world has unrestricted access to the truth packet. The proposed player disclosure records below cover narrowly learned outcomes; they neither implement subjective interpretation nor replace the observer-packet contract. Observer applicability, packet schemas, perspective persistence, and the atomicity of event/perspective commitments remain explicit design work; no schema or simultaneous transaction is implied here.
+
+Packets are presentation-independent native interfaces. They are intended to support LLM prose, TTS, ANSI/TUI, ComfyUI, Unity, and Godot without granting those systems canonical authority. Downstream conditioning and rendering cannot write backward into committed canon. A host may submit a new input only through normal authorization and commitment. Existing Lite dictionaries and command interpretation packets are not evidence that this complete truth/observer packet standard is implemented.
+
 ### Prose Conditioner
 
 The prose conditioner transforms structured simulation output into narrative representation.
@@ -127,6 +143,74 @@ Each component must remain independently usable wherever its input contract is s
 No component may assume that another specific component exists upstream or downstream.
 
 The external application and the internal engine pipelines follow the same principles of isolation, composability, and explicit authority.
+
+### Lite Audience Disclosure Contract — Architecture Checkpoint
+
+**Status: specified, not implemented.** The current Lite interpreter and presentation context still receive active canonical facts without audience filtering. This contract does not certify the current runtime as audience-safe. Production integration and its acceptance tests must be completed together before that claim is made.
+
+#### Responsibilities and authority
+
+Canonical commitment establishes world truth. Authorized disclosure commitment records that an audience legitimately acquired a specified part of that truth. Pure audience projection constructs permitted input for interpretation and presentation. These are distinct responsibilities with separate interfaces; disclosure must not become a prerequisite for NPC evaluation, opportunity selection, episode commitment, or historical reuse.
+
+Initially the only supported audience is the exact ID `player`, and the only NPC disclosure scope is `episode_outcome` under `truthful_npc_inquiry_v1`. A disclosure grants neither access to the whole NPC record nor future refinements such as a disagreement initiator. Unknown audiences, scopes, sources, or policy versions fail closed. Neither an LLM, renderer, arbitrary text, nor a caller-supplied knowledge flag can grant disclosure.
+
+The first acquisition mechanism is the existing explicitly bound truthful NPC inquiry. Automatic witnessing is not supported: allowed places are episode permissions, not an established occurrence location; current co-location is not evidence of historical witnessing. Listening to configured ambience does not reveal episode history. Future witnessing, investigation, or evidence policies require independent authorization and may disclose only the aspects they establish. Evidence of a consequence does not automatically disclose its cause, actor, or motive. A momentary observation cannot prove an episode-wide negative outcome.
+
+#### Proposed version-1 storage and references
+
+Persist disclosure inside the existing canonical save, not in a separate knowledge database. The proposed extension is `disclosure = {version: 1, world_generation: <opaque-id>, npc_generation: <opaque-id>, records: [<record>, ...]}`. Generation identities distinguish resets, not time; they are established only by authorized setup, reset, or the first authorized disclosure transaction. Pure projection and loading never create them. Missing extension data means no recorded acquisitions, not public history. Malformed or unsupported extension data must be preserved and rejected, not silently replaced.
+
+Each NPC record has exactly `version`, `audience`, `scope`, `policy`, `reference`, and `source`. `version` is 1; `audience` is `player`; `scope` is `episode_outcome`; `policy` is `truthful_npc_inquiry_v1`. `reference` contains `world_generation`, `npc_generation`, `episode_id`, `event_id`, and `content_sha256`. The digest binds the authorized historical payload: episode ID, event fact ID/type/text, and committed outcome, serialized with an explicitly defined canonical JSON encoding (UTF-8, sorted keys, compact separators, no NaN). Mutable fact status and unrelated resolution extensions are excluded from the content digest but validated separately for disclosure eligibility. `source` identifies the exact installed inquiry binding and respondent ID. Do not store an editable second copy of the outcome as knowledge truth.
+
+The underlying episode resolution and uniquely referenced event must exist and agree. Missing, duplicate, changed, or contradictory references authorize no disclosure. Numeric IDs or matching prose alone are insufficient; generation and content binding are mandatory. Historical payloads must come from committed history, not reconstruction through mutable episode definitions. The disclosure implementation must not rewrite NPC resolutions to represent knowledge.
+
+This schema records acquisition provenance, not a general belief or testimony system. Persisted records are trusted only as canon-owned data validated against their content references. Digests detect content/reference mismatch; they are not signatures and do not protect against a user deliberately editing the save. The trust boundary is the host and its authorized canon operations.
+
+#### Inquiry authorization, freshness, and persistence
+
+A fresh disclosure request must independently validate the exact installed inquiry binding, supported audience/scope/policy, respondent and other participant, episode identity, committed outcome/event reference, and respondent availability at the player's unambiguous canonical location. Shared pure authorization rules may be reused; the disclosure producer or renderer must not be asked to approve its own proposal. Validate freshness again at commitment, including generation, source configuration, reference content, and availability. A generic arbitrary-fact grant endpoint is outside this slice.
+
+External inquiry orchestration validates eligibility before episode activation, obtains a committed or reused episode outcome, then requests disclosure commitment. Only after successful disclosure persistence may the outcome be presented. Episode commitment and disclosure commitment are separate units: disclosure failure must not erase the event or rerun its transitions. An uncommitted outcome is diagnostic material, never learnable history.
+
+A disclosure transaction builds a pending snapshot, validates it, persists it atomically, and only then updates caller memory. A known-safe write failure permits an explicit retry; an uncertain persistence result requires reconciliation. Failure responses to the player contain no outcome, hidden identities, or internal diagnostic details. Existing episode reuse supplies historical truth without new draws or transition replay.
+
+Identical audience/scope/reference/source records are idempotent. A conflicting record must fail rather than replace history. Projection of an existing valid acquisition does not depend on the original provider, current respondent availability, or the continued installation of its inquiry binding. Repeating a live inquiry still requires its current availability/binding authorization; remembering previously learned history does not.
+
+#### Reset and reference lifecycle
+
+A full world reset clears all disclosure records and rotates the world generation as part of the same persisted reset unit. An NPC reset clears NPC-outcome records and rotates the NPC generation in the same unit as the NPC reset; unrelated acquired information must survive. Stale pre-reset proposals cannot be committed afterward, even if an episode ID, fact ID, and text are recreated identically. Load must preserve generations and must never infer them from wall time or fact counters.
+
+Selective fact deletion, corruption, or a reference mismatch invalidates affected disclosures without inventing replacement truth. Undisclosed events remain canonical and causally meaningful. Ordinary state supersession must never transfer a grant from an old fact to its replacement. Reset atomicity is required for this extension; existing memory-before-save reset/setter paths must not be assumed to provide it.
+
+#### Pure player-context projection
+
+The engine constructs a versioned, detached player envelope before any model or renderer receives context. Its declared inputs are authoritative state, the audience ID, approved room/content definitions, and operation-specific authorized turn results. It produces current perception, learned history, and turn results as separate fields. It performs no sampling, disclosure commitment, state mutation, loading, or window advancement. Projection is not acquisition: rendering an envelope must never create knowledge records.
+
+For the initial Lite perception policy, allowlist current-room display name, description, ambience, visible exits, currently accessible entities, inventory, and supported visible properties. Only explicitly declared properties are exposed; current room membership must not grant every entity attribute. Keep ordinary canonical rule validation and commitment on full state. Do not weaken rules by passing a player-filtered world into them.
+
+Room/content definitions require a presentation allowlist. Never pass complete room dictionaries, observation constraints, latent alternatives, future-detail fields, raw facts, whole NPC records, internal dispositions, proposal bases, or transition diagnostics. Learned history includes only the content authorized by valid persisted references. Historical knowledge is labeled historical and must not expose later offscreen state changes or masquerade as current perception.
+
+Both command interpretation and prose conditioning consume this engine-produced envelope. Their adapters must reject legacy raw-canon inputs on player-facing entry points rather than silently treating them as authorized context. A renderer formats supplied material; it cannot query more canon or grant itself disclosure. Optional modules can transform only authorized envelope material and cannot bypass the projection boundary.
+
+Turn-local action results and rule-block messages require typed, operation-specific authorization, not an arbitrary trusted string field. Only the permitted result of the current validated action may be included. User input is untrusted request text, not a canonical assertion. Projection failures use generic safe output; detailed rejection reasons remain developer-only.
+
+Deterministic rendering is the safe baseline. Filtered model inputs prevent canonical secrets from entering those requests; they do not establish that unrestricted generated prose is semantically authorized. Free-form narration needs a separately validated output contract or a safe deterministic fallback before it can receive an audience-safety guarantee.
+
+#### Ordinary gameplay, diagnostics, and migration
+
+Preserve the existing meanings of look, listen, inventory, movement, reference resolution, aliases, search/inspect, lazy collapse, and rule-block outcomes. A current supported perception policy may authorize visible state without a permanent record for every render. Remembered discoveries require acquisition provenance: collapse markers alone do not identify the learned fact, and the current CLI discards discovery IDs/category/source metadata when calling `add_fact`.
+
+Before full integration, specify and implement a narrowly authorized observation acquisition path that retains the selected discovery identity, room/space/verb, and content-bound fact reference. It must validate the permitted discovery and canonical constraints independently of a producer. It must not infer historical causes from optional candidate annotations. This is an ordinary-observation compatibility responsibility, not permission for a general historical-fact grant API or a second NPC disclosure scope. The atomic unit for discovery facts, collapse markers, and acquisition records must be defined and tested; separate memory-before-save `add_fact` calls do not satisfy that requirement. The corresponding bounded action-result handoff must preserve current rule-block precedence and avoid automatic disclosure of unrelated consequences.
+
+Existing saves never silently acquire records on load. Legacy NPC events remain undisclosed until an authorized acquisition. Explicit migration may bind known fixture observations to declared provenance only when the necessary evidence is established; arbitrary active prose must not be classified public from wording or status. Previously printed discoveries cannot generally be reconstructed from current saves, so compatibility must distinguish current perception from unavailable historical acquisition evidence. Preserve unrecognized world and extension data rather than deleting it.
+
+Explicit developer diagnostics may inspect complete canon and previews through a host-selected developer path. They do not create player knowledge. Full-canon logs, raw model packets, preview candidates, and NPC transition diagnostics must not appear automatically in ordinary gameplay or be appended to player model context. This boundary is separate from filesystem access control; the save remains inspectable by its owner.
+
+#### Implementation checkpoint and acceptance gate
+
+This contract is the architecture checkpoint for the disclosure milestone. No production disclosure path is implemented by this documentation update. The integration must cover canon-owned records and resets, independently authorized NPC inquiry, ordinary observation acquisition/atomicity, typed turn results, safe interpreter and presentation inputs, and separated diagnostics. Shipping only an NPC-event filter would leave other disclosure paths open and is not a completed boundary.
+
+Acceptance must demonstrate hidden-event persistence without player/model leakage; scoped authorized inquiry; rejected forged/unavailable/uncommitted acquisition; reload/provider-removal retention; persistence failure without disclosure or premature memory change; fail-closed legacy/corrupt metadata; no inferred witnessing; no disclosure of later state through old knowledge; reset/generation protection; projection purity; and regression coverage for ordinary observation, collapse idempotence, movement, inventory, aliases, and rule-block rendering. Existing NPC regression tests remain required. Keep single-threaded/current-caller-state limitations explicit; this work adds no scheduler, general sensory simulation, testimony, beliefs, deception, or high-resolution Behavior.
 
 ## 4. Internal Engine Pipeline
 
@@ -183,7 +267,7 @@ Canonical state is authoritative.
 
 Only authorized commitment operations may establish or change canonical facts.
 
-Proposals, evaluations, probabilities, interpretations, and narrative descriptions are not canonical truth.
+Proposals, evaluations, probabilities, uncommitted interpretations, and narrative descriptions are not canonical truth. An authorized commitment of an observer perspective establishes that perspective, not the objective truth of everything the observer believes.
 
 Previously committed history must constrain subsequent resolution.
 
@@ -220,6 +304,12 @@ Committed consequences may exist before their detailed narrative explanation, pr
 Causal correctness constrains dependencies and permissible history; it does not require inventing a narrative cause for every state change. A simulation policy may use committed information to authorize a state transition without asserting that information as its psychological or narrative cause. Later details may resolve only still-open information consistent with canon; a causal explanation requires its own explicit authorization and, when it establishes world truth, commitment.
 
 An offscreen event can resolve and commit consequences without the player's knowledge. Observation can subsequently reveal those consequences or resolve remaining details.
+
+Mushin primarily models continuity and authorized state changes rather than exhaustive predefined object descriptions. An entity can retain identity without an object-specific code class or complete property definition. Undefined properties remain unresolved until legitimately established; an established property unknown to an observer is a different condition. Prematurely establishing unnecessary properties removes possibilities and can force avoidable contradictions or retcons.
+
+General action and eligibility rules should permit unforeseen interactions without requiring object-specific methods for every action. A chair may move between rooms without a `Chair` class; a player may propose carving a name into a table without a predefined carve-name method. Both changes still require independent authorization. LLM semantic understanding may propose plausible actions, objects, and consequences, but plausibility alone never authorizes them. Current Lite action allowlists are implementation limits, not the target's conceptual limit.
+
+Every committed change preserves the arrow of time and constrains subsequent events. A simulation turn is an ordered slice of an evolving canonical timeline; a general clock is a separate capability. This principle does not implicitly advance the explicit NPC decision windows described in §8.
 
 ## 7. Graceful Degradation
 
@@ -300,6 +390,14 @@ Archetypes provide low-resolution behavioral decisions, including the possibilit
 An NPC must not become passive merely because the optional Behavior module is absent.
 
 Archetype-driven decisions remain subject to the same probability resolution, rule validation, and canonical commitment requirements as enhanced decisions.
+
+### Subjective Interpretation and NPC DNA
+
+Subjective interpretation is fundamental to Lite. Observers may interpret the same committed event differently; one interaction can legitimately leave one NPC angry and another hurt. Objective canon and individual perspectives remain distinct. Archetypes supply low-resolution subjective and behavioral weighting without requiring Behavior. Full attempts higher-resolution individual interpretation and behavior. These are architectural responsibilities, not claims that current episode outcomes or disposition transitions already implement observer perspectives.
+
+The intended Full configuration separates stable **NPC DNA**, defined in YAML, from mutable NPC state and accumulated experience maintained in JSON. Full uses a shared neutral human reference configuration; individual DNA defines deviations from that common baseline. Global baseline adjustments affect the shared mechanism, while individual deltas customize particular NPCs. DNA should rarely change during ordinary simulation. Configuration changes must not reinterpret already committed history or perspectives.
+
+The **individual lens** is produced from the shared baseline, DNA deltas, current state, and history. It refines behavioral possibilities and weights without canonical authority. Its primitives, configuration schema, update rules, and refinement authorization remain future implementation work. Do not substitute a new high-order personality-stat system for this low-order-primitives objective. Lite's existing fixture dispositions are a bounded baseline, not an implementation of NPC DNA or Full's individual lens.
 
 ### Optional Behavior Module
 
@@ -423,6 +521,10 @@ Player observation may determine when unresolved details are established, but do
 
 Cartridges supply world-specific content, rules, and configuration without imposing those assumptions on the engine core.
 
+Cartridges define worlds, scenarios, and their particular constraints without owning the engine's internal authority. The house test world is intended to evolve into a standalone whodunnit cartridge. The lucid dream is the intended first public experience, with variable surrealism influencing eligible possibilities and probability weighting within canonical constraints. The neighborhood is the long-term Lite sandbox target. These are project plans and examples, not implemented cartridges or hardcoded engine dependencies.
+
+Mushin remains headless by design. Renderers and external applications may be replaced without changing established canonical outcomes. An outside application may use Mushin as a contained decision-making environment and submit inputs through declared interfaces, but cannot directly mutate its canon.
+
 ## 10. Module Lifecycle and Compatibility
 
 Every module contract must define:
@@ -456,6 +558,23 @@ Proposed revisions must identify affected invariants and explain the reason for 
 Implementation gaps are maintained separately from the contract.
 
 Architectural deviations do not authorize refactoring without explicit approval.
+
+### Native Vocabulary
+
+Preserve Mushin's native vocabulary in architecture documents, code identifiers, and public documentation. Do not silently substitute conventional software or game-development terms, or add jargon where an existing Mushin term accurately describes the concept. Terminology changes that alter conceptual boundaries require explicit architectural approval; this documentation does not authorize identifier renames.
+
+| Native term | Contract usage |
+| --- | --- |
+| Canon | Authoritative established simulation reality. |
+| Observation collapse | Authorized resolution of previously unresolved possibilities through observation. |
+| Truth packet | Objective committed-event output, subject to audience authorization. |
+| Observer packet / Subjective packet | An applicable observer's established perspective, distinct from objective event truth. |
+| NPC DNA | Stable individual configuration; intended YAML definition. |
+| Individual lens | Interpretation/refinement from shared baseline, DNA deltas, state, and history. |
+| Archetype | Lite's baseline subjective and behavioral mechanism. |
+| Cartridge | A world/scenario and its particular constraints, without engine write authority. |
+| Evidence gravity | Retained native term; its precise operational contract is not specified here. Do not invent a weighting algorithm or silently rename it. |
+| Prose Conditioner | Authorized packet-to-prose transformation without canonical authority. |
 
 ## 12. Development Review Requirements
 
