@@ -366,6 +366,26 @@ def collapse_observation(
     return results
 
 
+def resolve_observation_candidates(candidates, rng=None):
+    """Sample explicit eligible possibilities; return identity only, never facts."""
+    if (not isinstance(candidates, list)
+            or any(not isinstance(c, dict) or not isinstance(c.get("id"), str)
+                   or type(c.get("weight")) not in (int, float)
+                   or not math.isfinite(c["weight"]) or c["weight"] < 0 for c in candidates)):
+        raise ValueError("Invalid observation distribution")
+    if not candidates:
+        return None
+    positive = [c for c in candidates if c["weight"] > 0]
+    total = sum(c["weight"] for c in positive)
+    if not positive or not math.isfinite(total):
+        raise ValueError("Invalid observation distribution")
+    draw = (rng if rng is not None else _collapse_rng).random()
+    if type(draw) not in (int, float) or not 0 <= draw < 1:
+        raise ValueError("Invalid observation random draw")
+    selected = select_candidate(positive, "", {}, rng=SimpleNamespace(random=lambda: draw))
+    return selected["id"]
+
+
 def existing_npc_episode(npc, episode_id):
     """Return invalid/reused diagnostics, or None when evaluation is needed."""
     result = {

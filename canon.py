@@ -488,6 +488,42 @@ def fact_slot(text, fact_type):
 
     return None
 
+def commit_observation(state, proposal, world_inputs):
+    """Authorize and atomically persist one reveal/marker unit; never sample."""
+    from observation_rules import validate_observation
+
+    def result(status, reason=None, facts=None):
+        return {"version": 1, "status": status, "reason": reason,
+                "facts": deepcopy(facts or []), "rule_block_text": None}
+
+    try:
+        effects = validate_observation(state, proposal, world_inputs)
+        if "npc" in state:
+            validate_npc_state(state["npc"])
+    except (ValueError, TypeError, KeyError, OverflowError, RecursionError) as error:
+        return result("rejected", str(error))
+    if not effects:
+        return result("no_change")
+    pending = deepcopy(state)
+    committed = []
+    for effect in effects:
+        slot = fact_slot(effect["text"], effect["type"])
+        for fact in pending["facts"]:
+            if (slot is not None and fact.get("status", "active") == "active"
+                    and fact_slot(fact["text"], fact.get("type", "state")) == slot):
+                fact["status"] = "superseded"
+        fact = dict(effect, id=pending["next_fact_id"], status="active")
+        pending["facts"].append(fact)
+        pending["next_fact_id"] += 1
+        committed.append(fact)
+    try:
+        _save_npc_commit(pending)
+    except (OSError, ValueError, TypeError) as error:
+        return result("failed", "Persistence failed; reconcile before retry: " + str(error))
+    state.update(pending)
+    return result("committed", facts=committed)
+
+
 def commit_player_action(state, proposal, world_inputs):
     """Commit one independently authorized ordinary action as an atomic unit.
 

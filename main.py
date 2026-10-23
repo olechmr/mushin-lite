@@ -1,3 +1,6 @@
+import collapse
+from observation_activation import activate_observation
+from observation_rules import POLICY as OBSERVATION_POLICY
 from copy import deepcopy
 from canon import commit_player_action
 from player_action_rules import POLICY as PLAYER_ACTION_POLICY
@@ -12,7 +15,6 @@ from world import slot_value, build_entity_state, build_world_state, entities_in
 import map_data
 from map_data import load_map, reset_map
 from collapse import (
-    collapse_observation,
     collapse_disagreement_initiator,
     preview_observation,
 )
@@ -267,18 +269,17 @@ def handle_observation_command(
     verb,
     target,
 ):
-    ctx = build_presentation_context(
-        user_input=user_input,
-        packet={
-            "action": verb,
-            "target": target,
-        },
-        facts=state["facts"],
-    )
-
-    room_id = ctx.get("room_id")
-    room = ctx.get("room") or {}
-    observation_spaces = room.get("observations", [])
+    # Binding uses canon and installed definitions, never renderer context.
+    whereabouts = build_entity_state(state["facts"]).get("player", {}).get("whereabouts")
+    room_id = (whereabouts[len("in the "):] if isinstance(whereabouts, str)
+               and whereabouts.startswith("in the ") else None)
+    room = map_data.ROOMS.get(room_id, {})
+    observation_spaces = room.get("observations", []) if isinstance(room, dict) else None
+    if (not isinstance(observation_spaces, list)
+            or any(not isinstance(space, dict) or not isinstance(space.get("verbs"), list)
+                   for space in observation_spaces)):
+        print("The observation could not be committed.")
+        return "rejected"
 
     if not observation_spaces:
         print()
@@ -308,15 +309,13 @@ def handle_observation_command(
         print()
         return
 
-    observation_space = next(
-        (
-            space
-            for space in observation_spaces
-            if target.lower()
-            == space.get("display_name", "").lower()
-        ),
-        None,
-    )
+    matches = [space for space in observation_spaces
+               if isinstance(space.get("display_name"), str)
+               and target.lower() == space["display_name"].lower()]
+    if len(matches) > 1:
+        print("The observation could not be committed.")
+        return "rejected"
+    observation_space = matches[0] if matches else None
 
     if observation_space is None:
         print()
@@ -332,24 +331,15 @@ def handle_observation_command(
         print()
         return
 
-    reveals = collapse_observation(
-        room_id,
-        observation_space,
-        state["facts"],
-        verb=verb,
-    )
-
-    found = []
-
-    for reveal in reveals:
-        added = add_fact(
-            state,
-            reveal["text"],
-            reveal.get("type", "state"),
-        )
-
-        if added and reveal.get("type", "state") != "collapse":
-            found.append(reveal["text"])
+    result = activate_observation(state, room_id, observation_space.get("id"), verb, {
+        "policy": OBSERVATION_POLICY, "rooms": map_data.ROOMS,
+        "discoveries": collapse.OBSERVATION_DISCOVERIES})
+    if result["status"] in {"rejected", "failed"}:
+        print("The observation could not be committed.")
+        if result["status"] == "failed":
+            print("Persistence requires reconciliation before another action.")
+        return result["status"]
+    found = [fact["text"] for fact in result["facts"] if fact["type"] != "collapse"]
 
     print()
 
@@ -1095,12 +1085,14 @@ try:
 
             search_target = user_input[7:].strip()
 
-            handle_observation_command(
+            observation_status = handle_observation_command(
                 state,
                 user_input,
                 "search",
                 search_target,
             )
+            if observation_status == "failed":
+                break
 
             continue
 
@@ -1108,12 +1100,14 @@ try:
 
             inspect_target = user_input[8:].strip()
 
-            handle_observation_command(
+            observation_status = handle_observation_command(
                 state,
                 user_input,
                 "inspect",
                 inspect_target,
             )
+            if observation_status == "failed":
+                break
 
             continue
 
