@@ -37,6 +37,10 @@ Integration cannot safely stop at excluding NPC event text. At that checkpoint, 
 
 The next production checkpoint must implement and test records/authorization/reset behavior and the observation/action compatibility contracts, then wire all player model/presentation entry points and separate diagnostics. Until that integration passes its acceptance gate, do not claim offscreen simulation is player-safe. Missing legacy acquisition evidence must not be repaired by classifying active facts as public. General testimony, witnessing, beliefs, sensory simulation, and free-form prose verification remain deferred.
 
+## NPC disclosure validation clarification
+
+Based on `47854b3`, §3 now specifies exact NPC source fields (`inquiry_binding`, `respondent_id`) and identity validation, independent current-binding checks for new acquisition, and historical validation without the original binding/provider. Referenced NPC events may be `active`, `superseded`, or `resolved`; missing or unsupported status rejects disclosure independently of the unchanged content digest. Source/reference history must not be reconstructed from current configuration or legacy events. These are approved documentation clarifications only: shared validators, acquisition commitments, resets, and presentation filtering remain unimplemented. The unified version-1 envelope and observation variant are unchanged; G-03/G-04/G-08/G-15 remain open.
+
 ## Observation acquisition schema design checkpoint
 
 Based on `2fa7239`, §3 now contains a **proposed, unimplemented** `observation_discovery` / `player_observation_v1` record variant within the existing disclosure envelope. The unified unshipped version-1 envelope, exact source/reference fields and digest encoding, historical reveal-status handling, and duplicate/corruption policy are now approved architectural decisions; the storage contract remains proposed and unimplemented. No production schema, migration, or player knowledge is created by this documentation.
