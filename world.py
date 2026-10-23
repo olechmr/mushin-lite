@@ -234,8 +234,11 @@ def resolve_entity_reference(reference, entities, player_whereabouts):
     return matches[0] if len(matches) == 1 else None
 
 
-def interaction_supported(entity_id, action, entity_state=None, player_whereabouts=None):
-    definition = ENTITY_DEFINITIONS.get(entity_id, {})
+def interaction_supported(entity_id, action, entity_state=None, player_whereabouts=None,
+                          entity_definitions=None):
+    """Pure eligibility predicate; commitment supplies trusted definitions explicitly."""
+    definitions = ENTITY_DEFINITIONS if entity_definitions is None else entity_definitions
+    definition = definitions.get(entity_id, {})
     interactions = definition.get("interactions", [])
 
     if action not in interactions:
@@ -279,3 +282,16 @@ def interaction_supported(entity_id, action, entity_state=None, player_whereabou
         )
 
     return True
+
+
+def action_already_satisfied(action, entity_state):
+    """Shared pure block predicate; no proposal or canonical writes."""
+    required = {
+        "take": ("whereabouts", "held by player"),
+        "drop": ("whereabouts", "on the ground"),
+        "open": ("open_state", "open"),
+        "close": ("open_state", "closed"),
+        "light": ("light_state", "lit"),
+        "extinguish": ("light_state", "not lit"),
+    }.get(action)
+    return required is not None and entity_state.get(required[0]) == required[1]

@@ -1,3 +1,4 @@
+from world import action_already_satisfied
 import map_data
 from map_data import add_exit
 
@@ -64,7 +65,7 @@ def apply_rules(packet, candidates, world, world_state):
 
     extra_candidates = []
 
-    if action == "take" and obj_state.get("whereabouts") == "held by player":
+    if action == "take" and action_already_satisfied(action, obj_state):
 
         LAST_RULE = "already holding"
         LAST_RULE_TYPE = "block"
@@ -76,7 +77,7 @@ def apply_rules(packet, candidates, world, world_state):
             }
         ]
 
-    if action == "drop" and obj_state.get("whereabouts") == "on the ground":
+    if action == "drop" and action_already_satisfied(action, obj_state):
 
         LAST_RULE = "already on ground"
         LAST_RULE_TYPE = "block"
@@ -88,7 +89,7 @@ def apply_rules(packet, candidates, world, world_state):
             }
         ]
 
-    if action == "open" and obj_state.get("open_state") == "open":
+    if action == "open" and action_already_satisfied(action, obj_state):
 
         LAST_RULE = "already open"
         LAST_RULE_TYPE = "block"        
@@ -100,7 +101,7 @@ def apply_rules(packet, candidates, world, world_state):
             }
         ]
 
-    if action == "close" and obj_state.get("open_state") == "closed":
+    if action == "close" and action_already_satisfied(action, obj_state):
 
         LAST_RULE = "already closed"
         LAST_RULE_TYPE = "block"
@@ -174,7 +175,7 @@ def apply_rules(packet, candidates, world, world_state):
         LAST_RULE = "taking object removes it from ground"
         LAST_RULE_TYPE = "consequence"
 
-    if action == "light" and obj_state.get("light_state") == "lit":
+    if action == "light" and action_already_satisfied(action, obj_state):
 
         LAST_RULE = "already lit"
         LAST_RULE_TYPE = "block"
@@ -186,7 +187,7 @@ def apply_rules(packet, candidates, world, world_state):
             }
         ]
 
-    if action == "extinguish" and obj_state.get("light_state") == "not lit":
+    if action == "extinguish" and action_already_satisfied(action, obj_state):
 
         LAST_RULE = "already extinguished"
         LAST_RULE_TYPE = "block"

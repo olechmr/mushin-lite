@@ -488,6 +488,56 @@ def fact_slot(text, fact_type):
 
     return None
 
+def commit_player_action(state, proposal, world_inputs):
+    """Commit one independently authorized ordinary action as an atomic unit.
+
+    Events always append; matching prose is not occurrence identity. No automatic
+    retry: a failed/uncertain save requires host reconciliation before retrying.
+    Caller-owned state/configuration must be current and calls serialized.
+    """
+    from player_action_rules import validate_player_action
+
+    def result(status, reason=None, facts=None, block=None):
+        return {"version": 1, "status": status, "reason": reason,
+                "facts": deepcopy(facts or []), "rule_block_text": block}
+
+    try:
+        effects, block = validate_player_action(state, proposal, world_inputs)
+        if "npc" in state:
+            validate_npc_state(state["npc"])
+    except (ValueError, TypeError, KeyError, RecursionError) as error:
+        return result("rejected", str(error))
+
+    pending = deepcopy(state)
+    committed = []
+    for effect in effects:
+        text, kind = effect["text"], effect["type"]
+        slot = fact_slot(text, kind)
+        if kind == "state":
+            active = [f for f in pending["facts"]
+                      if f.get("status", "active") == "active"
+                      and f.get("type", "state") == "state"]
+            if any(normalize_fact(f["text"]) == normalize_fact(text) for f in active):
+                continue
+            for fact in active:
+                if slot is not None and fact_slot(fact["text"], "state") == slot:
+                    fact["status"] = "superseded"
+        fact = {"id": pending["next_fact_id"], "text": text,
+                "status": "active", "type": kind}
+        pending["facts"].append(fact)
+        pending["next_fact_id"] += 1
+        committed.append(fact)
+    if not committed:
+        return result("no_change", block=block)
+    try:
+        # Reuse only atomic snapshot infrastructure, not NPC authorization.
+        _save_npc_commit(pending)
+    except (OSError, ValueError, TypeError) as error:
+        return result("failed", "Persistence failed; reconcile before retry: " + str(error))
+    state.update(pending)
+    return result("committed", facts=committed, block=block)
+
+
 def add_fact(state, fact_text, fact_type="state"):
 
     normalized_new = normalize_fact(fact_text)

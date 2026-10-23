@@ -1,3 +1,7 @@
+from copy import deepcopy
+from canon import commit_player_action
+from player_action_rules import POLICY as PLAYER_ACTION_POLICY
+from world import ENTITY_DEFINITIONS
 import npc_activation
 from canon import commit_disagreement_initiator, commit_npc_transition, set_npc_disposition, reset_npc_test_fixture, load_state, add_fact, forget_fact, forget_all, resolve_fact, fact_slot
 import llm_adapter
@@ -1174,6 +1178,10 @@ try:
             print()
             continue
 
+        action_basis = deepcopy(state)
+        action_inputs = {"policy": PLAYER_ACTION_POLICY,
+                         "entities": deepcopy(ENTITY_DEFINITIONS),
+                         "exits": deepcopy(map_data.EXITS)}
         packet_candidates = facts_from_packet(packet, state["facts"])
 
         world = build_entity_state(state["facts"])
@@ -1186,34 +1194,29 @@ try:
             world_state
         )
 
-        rule_block_text = None
+        # `none` is the existing non-committing interpreter fallback.
+        if action == "none":
+            commitment = {"status": "no_change", "facts": [], "rule_block_text": None}
+        else:
+            proposal = {"version": 1, "action": action, "target": target,
+                        "effects": packet_candidates, "basis": action_basis,
+                        "configuration_basis": action_inputs}
+            commitment = commit_player_action(state, proposal, {
+                "policy": PLAYER_ACTION_POLICY,
+                "entities": ENTITY_DEFINITIONS, "exits": map_data.EXITS})
+        if commitment["status"] in {"rejected", "failed"}:
+            print("The action could not be committed.")
+            if commitment["status"] == "failed":
+                print("Persistence requires reconciliation before another action.")
+                break
+            continue
 
-        if rules.LAST_RULE_TYPE == "block":
-            rule_block_text = " ".join(
-                candidate["text"]
-                for candidate in packet_candidates
-                if candidate["type"] == "event"
-            )
-
+        rule_block_text = commitment["rule_block_text"]
+        committed_states = [f for f in commitment["facts"] if f["type"] == "state"]
         if rules.LAST_RULE:
-            print(
-                f"[rule {rules.LAST_RULE_TYPE}] "
-                f"{rules.LAST_RULE}"
-            )
-
-        committed_states = []
-
-        for candidate in packet_candidates:
-
-            if add_fact(
-                state,
-                candidate["text"],
-                candidate["type"]
-            ):
-                if candidate["type"] == "state":
-                    committed_states.append(state["facts"][-1])
-
-                print(f'[debug saved] [{candidate["type"]}] {candidate["text"]}')
+            print(f"[rule {rules.LAST_RULE_TYPE}] {rules.LAST_RULE}")
+        for fact in commitment["facts"]:
+            print(f'[debug saved] [{fact["type"]}] {fact["text"]}')
 
         ctx = build_presentation_context(
             user_input,
