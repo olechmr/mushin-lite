@@ -11,8 +11,13 @@ STATE_FILE = "state.json"
 
 def load_state():
 
+    from disclosure_rules import decode_disclosure_state, inspect_disclosure
+
     with open(STATE_FILE, "r") as f:
-        state = json.load(f)
+        state = decode_disclosure_state(f.read())
+    disclosure = inspect_disclosure(state)
+    if disclosure["status"] not in ("valid", "absent"):
+        raise ValueError("Invalid disclosure storage: " + disclosure["status"])
 
     for fact in state["facts"]:
 
