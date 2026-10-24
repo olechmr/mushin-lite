@@ -385,7 +385,11 @@ try:
             continue
 
         if user_input == "/npctestreset":
-            reset_npc_test_fixture(state)
+            try:
+                reset_npc_test_fixture(state)
+            except ValueError as error:
+                print(f"[rejected] {error}")
+                continue
             print("[NPC fixture reset]")
             continue
 
@@ -817,7 +821,11 @@ try:
                 print("[error] Use /forget followed by a number.")
                 continue
 
-            removed = forget_fact(state, number)
+            try:
+                removed = forget_fact(state, number)
+            except ValueError as error:
+                print(f"[rejected] {error}")
+                continue
 
             if removed is None:
                 print("[error] No fact with that number.")
@@ -832,7 +840,11 @@ try:
 
             if confirm.lower() == "y":
 
-                forget_all(state)
+                try:
+                    forget_all(state)
+                except ValueError as error:
+                    print(f"[rejected] {error}")
+                    continue
 
                 print("[all canon cleared]")
 
@@ -848,7 +860,11 @@ try:
                 print("[error] Use /resolve followed by a number.")
                 continue
 
-            resolved = resolve_fact(state, number)
+            try:
+                resolved = resolve_fact(state, number)
+            except ValueError as error:
+                print(f"[rejected] {error}")
+                continue
 
             if resolved is None:
                 print("[error] No fact with that number.")
@@ -998,15 +1014,12 @@ try:
 
         if user_input == "/testreset":
 
-            forget_all(state)
+            try:
+                forget_all(state, foundation=TEST_FACTS)
+            except ValueError as error:
+                print(f"[rejected] {error}")
+                continue
             reset_map()
-
-            for fact in TEST_FACTS:
-                add_fact(
-                    state,
-                    fact["text"],
-                    fact.get("type", "state")
-                )
 
             print()
             print("[test fixture reset]")

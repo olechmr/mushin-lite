@@ -4,6 +4,7 @@ from copy import deepcopy
 import re
 import os
 import tempfile
+import uuid
 from npc_fixture import SUPPORTED_DISPOSITIONS
 
 STATE_FILE = "state.json"
@@ -51,6 +52,41 @@ def validate_npc_state(npc):
         raise ValueError("Invalid NPC state namespace")
 
 
+def _validate_lifecycle_state(state):
+    """Fail closed before reset/edit; never repair invalid acquisition history."""
+    from disclosure_rules import inspect_disclosure
+    if inspect_disclosure(state)["status"] not in ("valid", "absent"):
+        raise ValueError("Invalid disclosure storage; explicit reconciliation required")
+    if "npc" in state:
+        validate_npc_state(state["npc"])
+
+
+def _reset_disclosure(pending, scope):
+    """Only called within authorized reset transactions, never on load."""
+    previous = pending.get("disclosure")
+    # UUIDs are opaque reset identities, independent of simulation randomness.
+    world = str(uuid.uuid4()) if previous is None or scope == "world" else previous["world_generation"]
+    npc = str(uuid.uuid4())
+    if previous is not None and (npc == previous["npc_generation"] or
+            (scope == "world" and world == previous["world_generation"])):
+        raise ValueError("Reset generation identity was reused")
+    records = [] if previous is None or scope == "world" else [
+        r for r in previous["records"] if r["scope"] != "episode_outcome"]
+    pending["disclosure"] = {"version": 1, "world_generation": world,
+                             "npc_generation": npc, "records": records}
+
+
+def _persist_lifecycle(state, pending):
+    _validate_lifecycle_state(pending)
+    try:
+        _save_npc_commit(pending)
+    except (OSError, ValueError, TypeError) as error:
+        # Even a replace followed by an error leaves caller memory unchanged.
+        # The caller must reload/reconcile, not blindly repeat this operation.
+        raise OSError("Persistence failed; reconcile before retry: " + str(error)) from error
+    state.update(pending)
+
+
 def reset_npc_state(state, foundation=None):
     """Explicitly replace NPC state only; omit foundation to clear it.
 
@@ -59,14 +95,18 @@ def reset_npc_state(state, foundation=None):
     """
     npc = empty_npc_state() if foundation is None else deepcopy(foundation)
     validate_npc_state(npc)
-    state["npc"] = npc
-    save_state(state)
+    _validate_lifecycle_state(state)
+    pending = deepcopy(state)
+    pending["npc"] = npc
+    _reset_disclosure(pending, "npc")
+    _persist_lifecycle(state, pending)
 
 
 def reset_npc_test_fixture(state):
     """Reset the isolated experiment, including only its keyed historical events."""
     from npc_fixture import build_npc_fixture
 
+    _validate_lifecycle_state(state)
     npc = state.get("npc", empty_npc_state())
     validate_npc_state(npc)
     event_ids = {r["event_id"] for r in npc["resolutions"].values()
@@ -75,8 +115,8 @@ def reset_npc_test_fixture(state):
     pending["facts"] = [f for f in pending["facts"]
                         if not (f.get("type") == "event" and f.get("id") in event_ids)]
     pending["npc"] = build_npc_fixture()
-    _save_npc_commit(pending)
-    state.update(pending)
+    _reset_disclosure(pending, "npc")
+    _persist_lifecycle(state, pending)
 
 
 def set_npc_disposition(state, entity_id, attribute, value):
@@ -634,38 +674,71 @@ def add_fact(state, fact_text, fact_type="state"):
     return True
 
 
+def _selective_fact(state, number):
+    _validate_lifecycle_state(state)
+    if type(number) is not int or number < 1:
+        raise ValueError("Invalid fact ID")
+    matches = [f for f in state["facts"] if f["id"] == number]
+    if len(matches) > 1:
+        raise ValueError("Duplicate fact ID")
+    if not matches:
+        return None
+    fact = matches[0]
+    if fact.get("type") == "collapse":
+        raise ValueError("Observation collapse history requires an authorized reset")
+    return fact
+
+
 def forget_fact(state, number):
+    fact = _selective_fact(state, number)
+    if fact is None:
+        return None
+    for record in state.get("disclosure", {}).get("records", []):
+        ref = record["reference"]
+        if number in [ref.get(k) for k in ("event_id", "reveal_fact_id", "collapse_fact_id")]:
+            raise ValueError("Acquired historical references require an authorized reset")
+    pending = deepcopy(state)
+    pending["facts"] = [f for f in pending["facts"] if f["id"] != number]
+    _persist_lifecycle(state, pending)
+    return fact["text"]
 
-    for fact in state["facts"]:
 
-        if fact["id"] == number:
+def forget_all(state, foundation=None):
+    """Authorized full reset, optionally installing trusted setup facts atomically."""
+    _validate_lifecycle_state(state)
+    pending = deepcopy(state)
+    pending["facts"] = []
+    pending["next_fact_id"] = 1
+    pending["npc"] = empty_npc_state()
+    if foundation is not None:
+        if type(foundation) is not list:
+            raise ValueError("Invalid reset foundation")
+        slots, texts = set(), set()
+        for effect in foundation:
+            if (type(effect) is not dict or set(effect) != {"type", "text"}
+                    or effect["type"] not in ("state", "event", "trait")
+                    or type(effect["text"]) is not str or not effect["text"].strip()):
+                raise ValueError("Invalid reset fact")
+            slot = fact_slot(effect["text"], effect["type"])
+            key = (effect["type"], normalize_fact(effect["text"]))
+            if key in texts or (slot is not None and slot in slots):
+                raise ValueError("Conflicting reset foundation")
+            texts.add(key)
+            if slot is not None:
+                slots.add(slot)
+            pending["facts"].append(dict(effect, id=pending["next_fact_id"], status="active"))
+            pending["next_fact_id"] += 1
+    _reset_disclosure(pending, "world")
+    _persist_lifecycle(state, pending)
 
-            state["facts"].remove(fact)
-
-            save_state(state)
-
-            return fact["text"]
-
-    return None
-
-def forget_all(state):
-
-    state["facts"] = []
-    state["next_fact_id"] = 1
-    state["npc"] = empty_npc_state()
-
-    save_state(state)
 
 def resolve_fact(state, number):
-
-    for fact in state["facts"]:
-
-        if fact["id"] == number:
-
-            fact["status"] = "resolved"
-
-            save_state(state)
-
-            return fact["text"]
-
-    return None
+    fact = _selective_fact(state, number)
+    if fact is None:
+        return None
+    if fact.get("status") == "resolved":
+        return fact["text"]
+    pending = deepcopy(state)
+    next(f for f in pending["facts"] if f["id"] == number)["status"] = "resolved"
+    _persist_lifecycle(state, pending)
+    return fact["text"]
