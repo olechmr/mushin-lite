@@ -1,4 +1,4 @@
-"""Pure validation of canon-owned acquisition history, never acquisition authority.
+"""Pure historical validation and bounded acquisition authorization, never commitment.
 
 No configuration/provider lookup, I/O, sampling, generation creation, or writes.
 Inspection returns indices and diagnostics, not player-facing content. Hashes are
@@ -241,3 +241,48 @@ def recognize_acquisition(state, record):
         return {'status': 'not_found'}
     except (ValueError, TypeError, KeyError, RecursionError, UnicodeError) as error:
         return {**_error(error)}
+
+
+def validate_disclosure_preflight(state):
+    """Reject inconsistent storage before sampling or acquisition; never repair."""
+    result = inspect_disclosure(state)
+    if result['status'] not in ('valid', 'absent'):
+        raise ValueError('Disclosure requires reconciliation: ' + result['status'])
+
+
+def authorize_observation_acquisition(state, proposal, world_inputs,
+                                      reveal, marker, world_generation):
+    """Pure player_observation_v1 authorization for a newly allocated reveal pair.
+
+    Recheck truth eligibility through shared independent rules, not a producer.
+    No caller-supplied grant/source is accepted. This cannot acquire old facts.
+    """
+    from observation_rules import validate_observation
+
+    validate_disclosure_preflight(state)
+    effects = validate_observation(state, proposal, world_inputs)
+    _require(len(effects) == 2, 'no_new_discovery')
+    _identity(world_generation)
+    if 'disclosure' in state:
+        _require(world_generation == state['disclosure']['world_generation'], 'world_generation')
+    for offset, (fact, effect) in enumerate(zip((reveal, marker), effects)):
+        _fields(fact, ('id', 'type', 'text', 'status'))
+        _id(fact['id'])
+        _require(fact['id'] == state['next_fact_id'] + offset
+                 and fact['status'] == 'active'
+                 and {k: fact[k] for k in ('type', 'text')} == effect,
+                 'unauthorized_observation_fact')
+    record = {
+        'version': 1, 'audience': 'player', 'scope': 'observation_discovery',
+        'policy': 'player_observation_v1',
+        'reference': {'world_generation': world_generation,
+                      'reveal_fact_id': reveal['id'], 'collapse_fact_id': marker['id']},
+        'source': {'kind': 'player_observation', 'room_id': proposal['room_id'],
+                   'observation_id': proposal['observation_id'], 'verb': proposal['verb'],
+                   'discovery_id': proposal['discovery_id'], 'observation_policy': world_inputs['policy'],
+                   'configuration_sha256': content_sha256(world_inputs)}}
+    record['reference']['content_sha256'] = observation_content_sha256(
+        record, {k: reveal[k] for k in ('id', 'type', 'text')},
+        {k: marker[k] for k in ('id', 'type', 'text')})
+    _record_shape(record)
+    return record

@@ -534,14 +534,16 @@ def fact_slot(text, fact_type):
     return None
 
 def commit_observation(state, proposal, world_inputs):
-    """Authorize and atomically persist one reveal/marker unit; never sample."""
-    from observation_rules import validate_observation
+    """Authorize and atomically persist reveal, marker, and player acquisition."""
+    from observation_rules import validate_observation, validate_observation_state
+    from disclosure_rules import validate_disclosure_preflight, authorize_observation_acquisition
 
     def result(status, reason=None, facts=None):
         return {"version": 1, "status": status, "reason": reason,
                 "facts": deepcopy(facts or []), "rule_block_text": None}
 
     try:
+        validate_disclosure_preflight(state)
         effects = validate_observation(state, proposal, world_inputs)
         if "npc" in state:
             validate_npc_state(state["npc"])
@@ -549,18 +551,30 @@ def commit_observation(state, proposal, world_inputs):
         return result("rejected", str(error))
     if not effects:
         return result("no_change")
-    pending = deepcopy(state)
-    committed = []
-    for effect in effects:
-        slot = fact_slot(effect["text"], effect["type"])
-        for fact in pending["facts"]:
-            if (slot is not None and fact.get("status", "active") == "active"
-                    and fact_slot(fact["text"], fact.get("type", "state")) == slot):
-                fact["status"] = "superseded"
-        fact = dict(effect, id=pending["next_fact_id"], status="active")
-        pending["facts"].append(fact)
-        pending["next_fact_id"] += 1
-        committed.append(fact)
+    try:
+        pending = deepcopy(state)
+        committed = []
+        for effect in effects:
+            slot = fact_slot(effect["text"], effect["type"])
+            for fact in pending["facts"]:
+                if (slot is not None and fact.get("status", "active") == "active"
+                        and fact_slot(fact["text"], fact.get("type", "state")) == slot):
+                    fact["status"] = "superseded"
+            fact = dict(effect, id=pending["next_fact_id"], status="active")
+            pending["facts"].append(fact)
+            pending["next_fact_id"] += 1
+            committed.append(fact)
+        if "disclosure" not in pending:
+            pending["disclosure"] = {"version": 1, "world_generation": str(uuid.uuid4()),
+                                     "npc_generation": str(uuid.uuid4()), "records": []}
+        acquisition = authorize_observation_acquisition(
+            state, proposal, world_inputs, committed[0], committed[1],
+            pending["disclosure"]["world_generation"])
+        pending["disclosure"]["records"].append(acquisition)
+        validate_observation_state(pending)
+        validate_disclosure_preflight(pending)
+    except (ValueError, TypeError, KeyError, OverflowError, RecursionError, UnicodeError) as error:
+        return result("rejected", str(error))
     try:
         _save_npc_commit(pending)
     except (OSError, ValueError, TypeError) as error:

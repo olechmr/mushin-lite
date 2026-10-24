@@ -183,6 +183,8 @@ class ObservationTests(unittest.TestCase):
         self.rng.random.assert_not_called()
         self.assertEqual(self.state, before)
         self.reject(self.proposal())
+        # Model a legacy save without acquisitions, not damaged modern history.
+        del self.state["disclosure"]
         # Legacy marker remains sufficient even without a reveal link.
         self.state['facts'] = [f for f in self.state['facts'] if f['id'] != 2]
         canon.save_state(self.state)

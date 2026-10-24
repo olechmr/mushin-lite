@@ -3,11 +3,13 @@ from copy import deepcopy
 from canon import commit_observation
 from collapse import resolve_observation_candidates
 from observation_rules import observation_candidates
+from disclosure_rules import validate_disclosure_preflight
 
 
 def activate_observation(state, room_id, observation_id, verb, world_inputs, rng=None):
     basis, configuration = deepcopy(state), deepcopy(world_inputs)
     try:
+        validate_disclosure_preflight(state)
         candidates, _, _ = observation_candidates(state, room_id, observation_id, verb, world_inputs)
         discovery_id = resolve_observation_candidates(candidates, rng)
     except (ValueError, TypeError, KeyError, OverflowError, RecursionError) as error:
